@@ -14,6 +14,11 @@ import {
   Menu,
   AlignJustify,
   FileText,
+  Bookmark,
+  Highlighter,
+  Search,
+  List,
+  MessageSquare,
 } from "lucide-react";
 import type { ReaderSettings } from "@/lib/reader-settings";
 import { cn } from "@/lib/utils";
@@ -25,6 +30,22 @@ export interface NavItem {
   subitems?: NavItem[];
 }
 
+export interface BookmarkData {
+  id: string;
+  cfi: string;
+  label: string;
+  created_at: string;
+}
+
+export interface HighlightData {
+  id: string;
+  cfi_range: string;
+  color: string;
+  note: string | null;
+  text?: string;
+  created_at: string;
+}
+
 interface ReaderToolbarProps {
   visible: boolean;
   settings: ReaderSettings;
@@ -32,7 +53,14 @@ interface ReaderToolbarProps {
   chapter: string;
   progress: number;
   toc: NavItem[];
-  onNavigate: (href: string) => void;
+  bookmarks?: BookmarkData[];
+  highlights?: HighlightData[];
+  isBookmarked: boolean;
+  onNavigate: (cfi: string) => void;
+  onToggleBookmark: () => void;
+  onSearch?: (query: string) => void;
+  searchResults?: { cfi: string; excerpt: string }[];
+  isSearching?: boolean;
   onClose: () => void;
 }
 
@@ -43,11 +71,20 @@ export function ReaderToolbar({
   chapter,
   progress,
   toc,
+  bookmarks = [],
+  highlights = [],
+  isBookmarked,
   onNavigate,
+  onToggleBookmark,
+  onSearch,
+  searchResults = [],
+  isSearching = false,
   onClose,
 }: ReaderToolbarProps) {
   const router = useRouter();
-  const [showToc, setShowToc] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [activeTab, setActiveTab] = useState<"toc" | "bookmarks" | "highlights" | "search">("toc");
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (!visible) return null;
 
@@ -64,7 +101,10 @@ export function ReaderToolbar({
               <ArrowLeft className="w-5 h-5" />
             </button>
             <button
-              onClick={() => setShowToc(true)}
+              onClick={() => {
+                setShowSidebar(true);
+                setActiveTab("toc");
+              }}
               className="p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
             >
               <Menu className="w-5 h-5" />
@@ -78,41 +118,169 @@ export function ReaderToolbar({
             </p>
           </div>
           
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* TOC Sidebar */}
-      {showToc && (
-        <div className="pointer-events-auto absolute inset-y-0 left-0 w-80 bg-black/90 backdrop-blur-xl text-white shadow-2xl animate-in slide-in-from-left z-50 flex flex-col">
-          <div className="p-4 border-b border-white/10 flex items-center justify-between">
-            <h2 className="font-semibold text-lg">Table of Contents</h2>
-            <button onClick={() => setShowToc(false)} className="p-2 hover:bg-white/10 rounded-full cursor-pointer">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onToggleBookmark}
+              className="p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <Bookmark className={cn("w-5 h-5", isBookmarked ? "fill-current text-purple-400" : "")} />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {toc.length > 0 ? (
-              toc.map((item, idx) => (
+        </div>
+      </div>
+
+      {/* Sidebar */}
+      {showSidebar && (
+        <div className="pointer-events-auto absolute inset-y-0 left-0 w-80 bg-black/90 backdrop-blur-xl text-white shadow-2xl animate-in slide-in-from-left z-50 flex flex-col">
+          <div className="p-4 border-b border-white/10 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-lg">Menu</h2>
+              <button onClick={() => setShowSidebar(false)} className="p-2 hover:bg-white/10 rounded-full cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {/* Tabs */}
+            <div className="flex bg-white/10 p-1 rounded-lg">
+              {[
+                { id: "toc" as const, icon: List, title: "TOC" },
+                { id: "bookmarks" as const, icon: Bookmark, title: "Bookmarks" },
+                { id: "highlights" as const, icon: Highlighter, title: "Highlights" },
+                { id: "search" as const, icon: Search, title: "Search" },
+              ].map((t) => (
                 <button
-                  key={item.id || idx}
-                  onClick={() => {
-                    onNavigate(item.href);
-                    setShowToc(false);
-                    onClose();
-                  }}
-                  className="w-full text-left p-3 rounded-lg hover:bg-white/10 transition-colors text-sm font-medium cursor-pointer"
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={cn(
+                    "flex-1 p-1.5 flex justify-center items-center rounded-md transition-colors cursor-pointer",
+                    activeTab === t.id ? "bg-purple-500 text-white" : "text-white/60 hover:text-white"
+                  )}
+                  title={t.title}
                 >
-                  {item.label}
+                  <t.icon className="w-4 h-4" />
                 </button>
-              ))
-            ) : (
-              <p className="text-white/50 text-sm text-center mt-10">No chapters found</p>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {activeTab === "toc" && (
+              toc.length > 0 ? (
+                toc.map((item, idx) => (
+                  <button
+                    key={item.id || idx}
+                    onClick={() => {
+                      onNavigate(item.href);
+                      setShowSidebar(false);
+                      onClose();
+                    }}
+                    className="w-full text-left p-3 rounded-lg hover:bg-white/10 transition-colors text-sm font-medium cursor-pointer"
+                  >
+                    {item.label}
+                  </button>
+                ))
+              ) : (
+                <p className="text-white/50 text-sm text-center mt-10">No chapters found</p>
+              )
+            )}
+
+            {activeTab === "bookmarks" && (
+              bookmarks.length > 0 ? (
+                bookmarks.map((bm) => (
+                  <button
+                    key={bm.id}
+                    onClick={() => {
+                      onNavigate(bm.cfi);
+                      setShowSidebar(false);
+                      onClose();
+                    }}
+                    className="w-full text-left p-3 rounded-lg hover:bg-white/10 transition-colors text-sm cursor-pointer border-l-2 border-purple-500"
+                  >
+                    <p className="font-medium truncate">{bm.label || "Bookmark"}</p>
+                    <p className="text-xs text-white/50 mt-1">{new Date(bm.created_at).toLocaleDateString()}</p>
+                  </button>
+                ))
+              ) : (
+                <p className="text-white/50 text-sm text-center mt-10">No bookmarks yet</p>
+              )
+            )}
+
+            {activeTab === "highlights" && (
+              highlights.length > 0 ? (
+                highlights.map((hl) => (
+                  <button
+                    key={hl.id}
+                    onClick={() => {
+                      onNavigate(hl.cfi_range);
+                      setShowSidebar(false);
+                      onClose();
+                    }}
+                    className="w-full text-left p-3 rounded-lg hover:bg-white/10 transition-colors text-sm cursor-pointer flex flex-col gap-1"
+                    style={{ borderLeft: `4px solid ${hl.color}` }}
+                  >
+                    {hl.text && <p className="italic text-white/80 line-clamp-2">"{hl.text}"</p>}
+                    {hl.note && (
+                      <div className="flex items-start gap-1.5 mt-2 bg-white/5 p-2 rounded-md">
+                        <MessageSquare className="w-3 h-3 text-white/50 mt-0.5 shrink-0" />
+                        <p className="text-xs text-white/90">{hl.note}</p>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-white/40 mt-1">{new Date(hl.created_at).toLocaleDateString()}</p>
+                  </button>
+                ))
+              ) : (
+                <p className="text-white/50 text-sm text-center mt-10">No highlights yet</p>
+              )
+            )}
+
+            {activeTab === "search" && (
+              <div className="space-y-4">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (onSearch && searchQuery.trim()) onSearch(searchQuery);
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    type="text"
+                    placeholder="Search in book..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 bg-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button type="submit" className="bg-purple-500 p-2 rounded-lg cursor-pointer hover:bg-purple-600 transition-colors">
+                    <Search className="w-4 h-4" />
+                  </button>
+                </form>
+                
+                <div className="space-y-2 mt-4">
+                  {isSearching ? (
+                    <p className="text-white/50 text-sm text-center mt-10">Searching...</p>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map((res, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          onNavigate(res.cfi);
+                          setShowSidebar(false);
+                          onClose();
+                        }}
+                        className="w-full text-left p-3 rounded-lg hover:bg-white/10 transition-colors text-sm cursor-pointer"
+                      >
+                        <p className="text-white/80 text-xs leading-relaxed" dangerouslySetInnerHTML={{ __html: res.excerpt }} />
+                      </button>
+                    ))
+                  ) : searchQuery ? (
+                    <p className="text-white/50 text-sm text-center mt-10">No results found</p>
+                  ) : null}
+                </div>
+              </div>
             )}
           </div>
         </div>

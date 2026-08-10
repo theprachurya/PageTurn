@@ -23,6 +23,7 @@ declare module "epubjs" {
     archive: {
       createUrl(path: string): Promise<string>;
     };
+    load: (url: string) => Promise<unknown>;
     destroy(): void;
   }
 
@@ -37,6 +38,12 @@ declare module "epubjs" {
       select(name: string): void;
       fontSize(size: string): void;
       override(property: string, value: string): void;
+    };
+    annotations: {
+      highlight(cfiRange: string, data?: unknown, cb?: (e: Event) => void, className?: string, styles?: Record<string, string>): void;
+      underline(cfiRange: string, data?: unknown, cb?: (e: Event) => void, className?: string, styles?: Record<string, string>): void;
+      mark(cfiRange: string, data?: unknown, cb?: (e: Event) => void): void;
+      remove(cfiRange: string, type: string): void;
     };
     destroy(): void;
   }
