@@ -12,7 +12,7 @@ import { ReaderToolbar } from "./reader-toolbar";
 
 interface EpubReaderProps {
   bookId: string;
-  epubUrl: string;
+  epubUrl: string | ArrayBuffer;
   initialCfi?: string | null;
   initialProgress?: number;
 }

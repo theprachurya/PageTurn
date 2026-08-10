@@ -10,7 +10,7 @@ export default function ReadPage() {
   const params = useParams();
   const router = useRouter();
   const bookId = params.bookId as string;
-  const [epubUrl, setEpubUrl] = useState<string | null>(null);
+  const [epubUrl, setEpubUrl] = useState<string | ArrayBuffer | null>(null);
   const [initialCfi, setInitialCfi] = useState<string | null>(null);
   const [initialProgress, setInitialProgress] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -49,16 +49,18 @@ export default function ReadPage() {
         return;
       }
 
-      // Generate signed URL for private EPUB file
-      const { data: signedUrlData, error: urlError } = await supabase.storage
+      // Download EPUB file directly to avoid epub.js URL parsing issues
+      const { data: blob, error: downloadError } = await supabase.storage
         .from("epubs")
-        .createSignedUrl(book.epub_path, 3600); // 1 hour
+        .download(book.epub_path);
 
-      if (urlError || !signedUrlData) {
-        setError("Could not load EPUB file");
+      if (downloadError || !blob) {
+        setError("Could not download EPUB file");
         setLoading(false);
         return;
       }
+
+      const arrayBuffer = await blob.arrayBuffer();
 
       // Fetch reading progress
       const { data: userBook } = await supabase
@@ -73,7 +75,7 @@ export default function ReadPage() {
         setInitialProgress(Number(userBook.progress_percentage) || 0);
       }
 
-      setEpubUrl(signedUrlData.signedUrl);
+      setEpubUrl(arrayBuffer);
       setLoading(false);
     } catch {
       setError("Failed to load book");
