@@ -208,6 +208,15 @@ export function EpubReader({
         setProgress(pct);
         saveProgress(cfi, pct);
       }
+
+      // Re-apply highlights after relocating (safest place to apply them)
+      setTimeout(() => {
+        highlights.forEach(hl => {
+          try {
+            rendition.annotations.highlight(hl.cfi_range, {}, () => {}, "", { fill: hl.color, "fill-opacity": "0.3" });
+          } catch (e) { }
+        });
+      }, 100);
     }));
 
     rendition.on("rendered", ((...args: unknown[]) => {
@@ -237,6 +246,25 @@ export function EpubReader({
       });
     }));
 
+    // Iframe clicks (events inside the epub don't bubble to the parent div)
+    rendition.on("click", (e: any) => {
+      const width = e.view ? e.view.innerWidth : window.innerWidth;
+      const x = e.clientX;
+      
+      if (settings.layout === "scrolled") {
+        setShowToolbar(prev => !prev);
+        return;
+      }
+      
+      if (x < width * 0.3) {
+        rendition.prev();
+      } else if (x > width * 0.7) {
+        rendition.next();
+      } else {
+        setShowToolbar(prev => !prev);
+      }
+    });
+
     book.ready.then(() => {
       return book.locations.generate(1600);
     });
@@ -261,20 +289,6 @@ export function EpubReader({
       book.destroy();
     };
   }, [epubUrl, settings.layout]); // Re-render when layout changes
-
-  // Apply Highlights to Rendition
-  useEffect(() => {
-    if (!renditionRef.current) return;
-    const rendition = renditionRef.current;
-    
-    highlights.forEach(hl => {
-      try {
-        rendition.annotations.highlight(hl.cfi_range, {}, () => {}, "", { fill: hl.color, "fill-opacity": "0.3" });
-      } catch (e) {
-        console.error("Failed to apply highlight", e);
-      }
-    });
-  }, [highlights, epubUrl, settings.layout]);
 
   const updateSettings = (newSettings: Partial<ReaderSettings>) => {
     const updated = { ...settings, ...newSettings };
