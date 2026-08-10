@@ -125,11 +125,12 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- =====================================================
--- 9. Storage Bucket Policies (Run after creating buckets)
+-- 9. Storage Buckets & Policies
 -- =====================================================
--- Note: Create these buckets in the Supabase Dashboard first:
---   1. "epubs" bucket → set to PRIVATE
---   2. "covers" bucket → set to PUBLIC
+
+-- Auto-create the buckets
+INSERT INTO storage.buckets (id, name, public) VALUES ('epubs', 'epubs', false) ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('covers', 'covers', true) ON CONFLICT (id) DO NOTHING;
 
 -- EPUBs bucket policies (Private)
 CREATE POLICY "Users can upload own epubs"
