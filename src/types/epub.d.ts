@@ -9,6 +9,7 @@ declare module "epubjs" {
         [key: string]: unknown;
       }>;
       cover: Promise<string>;
+      navigation: Promise<{ toc: Array<{ href: string; label: string; id: string }> }>;
     };
     ready: Promise<void>;
     locations: {
