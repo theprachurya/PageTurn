@@ -33,7 +33,12 @@ export function EpubReader({
   const [chapter, setChapter] = useState("");
   const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings());
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const supabase = createClient();
+  
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (!supabaseRef.current && typeof window !== "undefined") {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current!;
 
   // Theme definitions
   const themes = {
