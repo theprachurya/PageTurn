@@ -335,32 +335,7 @@ export function ReaderToolbar({
             </div>
           </div>
 
-          {/* Layout Row */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-white/60 uppercase tracking-wider">
-              Layout
-            </span>
-            <div className="flex gap-2">
-              {[
-                { value: "paginated" as const, label: "Paginated", icon: FileText },
-                { value: "scrolled" as const, label: "Scroll", icon: AlignJustify },
-              ].map((layout) => (
-                <button
-                  key={layout.value}
-                  onClick={() => onSettingsChange({ layout: layout.value })}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer",
-                    settings.layout === layout.value
-                      ? "bg-purple-500 text-white shadow-lg"
-                      : "bg-white/10 hover:bg-white/20"
-                  )}
-                >
-                  <layout.icon className="w-3 h-3 inline mr-1" />
-                  {layout.label}
-                </button>
-              ))}
-            </div>
-          </div>
+
 
           {/* Font Size Row */}
           <div className="flex items-center justify-between">

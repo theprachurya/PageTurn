@@ -173,9 +173,9 @@ export function EpubReader({
     const rendition = book.renderTo(viewerRef.current, {
       width: "100%",
       height: "100%",
-      flow: settings.layout === "scrolled" ? "scrolled-doc" : "paginated",
+      flow: "scrolled-doc",
       spread: "none",
-      manager: settings.layout === "scrolled" ? "continuous" : "default",
+      manager: "continuous",
     });
 
     renditionRef.current = rendition;
@@ -248,21 +248,8 @@ export function EpubReader({
 
     // Iframe clicks (events inside the epub don't bubble to the parent div)
     rendition.on("click", (e: any) => {
-      const width = e.view ? e.view.innerWidth : window.innerWidth;
-      const x = e.clientX;
-      
-      if (settings.layout === "scrolled") {
-        setShowToolbar(prev => !prev);
-        return;
-      }
-      
-      if (x < width * 0.3) {
-        rendition.prev();
-      } else if (x > width * 0.7) {
-        rendition.next();
-      } else {
-        setShowToolbar(prev => !prev);
-      }
+      // In scrolled mode, clicks always toggle the toolbar rather than turning pages
+      setShowToolbar(prev => !prev);
     });
 
     book.ready.then(() => {
@@ -288,14 +275,14 @@ export function EpubReader({
       rendition.destroy();
       book.destroy();
     };
-  }, [epubUrl, settings.layout]); // Re-render when layout changes
+  }, [epubUrl]); // Only re-render when epubUrl changes
 
   const updateSettings = (newSettings: Partial<ReaderSettings>) => {
     const updated = { ...settings, ...newSettings };
     setSettings(updated);
     saveReaderSettings(newSettings);
     
-    if (newSettings.layout === undefined && renditionRef.current) {
+    if (renditionRef.current) {
       applySettings(renditionRef.current, updated);
     }
   };
@@ -311,22 +298,8 @@ export function EpubReader({
       return;
     }
 
-    if (settings.layout === "scrolled") {
-      setShowToolbar(!showToolbar);
-      return;
-    }
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const width = rect.width;
-
-    if (x < width * 0.3) {
-      goPrev();
-    } else if (x > width * 0.7) {
-      goNext();
-    } else {
-      setShowToolbar(!showToolbar);
-    }
+    // Since we are always scrolling now, any tap toggles the toolbar
+    setShowToolbar(!showToolbar);
   };
 
   // Actions
@@ -471,11 +444,13 @@ export function EpubReader({
         onClose={() => setShowToolbar(false)}
       />
 
-      <div
-        ref={viewerRef}
-        onClick={handleCenterTap}
-        className={`flex-1 overflow-hidden ${settings.layout === 'paginated' ? 'cursor-pointer' : ''}`}
-      />
+      <div className="flex-1 overflow-hidden flex justify-center w-full">
+        <div
+          ref={viewerRef}
+          onClick={handleCenterTap}
+          className="w-full max-w-3xl h-full shadow-sm"
+        />
+      </div>
 
       <div className={`h-1 ${settings.theme === "dark" ? "bg-slate-700" : "bg-gray-200"}`}>
         <div
