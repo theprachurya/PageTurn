@@ -198,7 +198,7 @@ export function EpubReader({
 
     applySettings(rendition, settings);
 
-    rendition.hooks.content.register((contents: any) => {
+    (rendition as any).hooks.content.register((contents: any) => {
       const style = contents.document.createElement("style");
       style.innerHTML = `
         ::-webkit-scrollbar { width: 8px; }
