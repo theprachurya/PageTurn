@@ -62,12 +62,12 @@ export default function ShelfPage() {
         const bookTags = tagsData
           ?.filter(t => t.book_id === ub.book_id)
           .map(t => t.tags)
-          .filter(Boolean) as BookTag[];
+          .filter(Boolean) as unknown as BookTag[];
 
         const bookShelves = shelvesData
           ?.filter(s => s.book_id === ub.book_id)
           .map(s => s.shelves)
-          .filter(Boolean) as BookShelf[];
+          .filter(Boolean) as unknown as BookShelf[];
 
         return {
           id: ub.id,
