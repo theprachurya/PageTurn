@@ -1,15 +1,29 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, X, BookOpen, Loader2 } from "lucide-react";
+import { Upload, X, BookOpen, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { extractEpubMetadata, type ExtractedBookData } from "@/lib/epub-utils";
-import { uploadBookToSupabase } from "@/lib/upload-book";
+import {
+  uploadBookToSupabase,
+  validateEpubFile,
+  checkForDrm,
+  type UploadProgress,
+  type UploadStage,
+} from "@/lib/upload-book";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 interface BookUploaderProps {
   onUploadComplete?: () => void;
 }
+
+const STAGE_LABELS: Record<UploadStage, string> = {
+  validating: "Validating file...",
+  uploading_epub: "Uploading EPUB...",
+  uploading_cover: "Uploading cover...",
+  saving_metadata: "Saving metadata...",
+  done: "Done!",
+};
 
 export function BookUploader({ onUploadComplete }: BookUploaderProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,6 +32,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -27,6 +42,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
     setError(null);
     setIsExtracting(false);
     setIsUploading(false);
+    setUploadProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -36,14 +52,29 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
   };
 
   const handleFile = async (file: File) => {
-    if (!file.name.endsWith(".epub")) {
-      setError("Please select an .epub file");
+    setError(null);
+
+    // 1. Basic validation (type + size)
+    const validationError = validateEpubFile(file);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
-    setError(null);
+    // 2. DRM check
     setIsExtracting(true);
+    try {
+      const isDrm = await checkForDrm(file);
+      if (isDrm) {
+        setError("This EPUB file appears to be DRM-protected. PageTurn cannot open DRM-protected books.");
+        setIsExtracting(false);
+        return;
+      }
+    } catch {
+      // If DRM check fails, continue — we'll catch issues later
+    }
 
+    // 3. Extract metadata
     try {
       const extracted = await extractEpubMetadata(file);
       setBookData(extracted);
@@ -53,7 +84,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
         setCoverPreview(previewUrl);
       }
     } catch {
-      setError("Could not read this EPUB file. It may be corrupted or DRM-protected.");
+      setError("Could not read this EPUB file. It may be corrupted.");
     } finally {
       setIsExtracting(false);
     }
@@ -76,6 +107,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
 
     setIsUploading(true);
     setError(null);
+    setUploadProgress({ stage: "validating", percentage: 0 });
 
     try {
       const supabase = createClient();
@@ -85,11 +117,15 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
 
       if (!user) throw new Error("Not authenticated");
 
-      await uploadBookToSupabase(bookData, user.id);
+      await uploadBookToSupabase(bookData, user.id, setUploadProgress);
+      
+      // Brief delay to show "Done!" state
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       handleClose();
       onUploadComplete?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -145,7 +181,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
                     <p className="text-sm text-purple-500">
-                      Extracting metadata...
+                      Checking file & extracting metadata...
                     </p>
                   </div>
                 ) : (
@@ -154,7 +190,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                     <p className="text-sm text-slate-600 mb-2">
                       Drag & drop your .epub file here
                     </p>
-                    <p className="text-xs text-slate-400 mb-4">or</p>
+                    <p className="text-xs text-slate-400 mb-4">Max 100 MB · No DRM</p>
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       className="px-4 py-2 rounded-xl bg-purple-100 text-purple-700 text-sm font-medium hover:bg-purple-200 transition-colors cursor-pointer"
@@ -173,58 +209,82 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
               </div>
             ) : (
               /* Preview */
-              <div className="flex gap-4">
-                <div className="w-28 h-40 rounded-xl overflow-hidden bg-gradient-to-br from-purple-100 to-lavender-100 flex-shrink-0">
-                  {coverPreview ? (
-                    <img
-                      src={coverPreview}
-                      alt="Cover preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <BookOpen className="w-10 h-10 text-purple-300" />
+              <div className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="w-28 h-40 rounded-xl overflow-hidden bg-gradient-to-br from-purple-100 to-lavender-100 flex-shrink-0">
+                    {coverPreview ? (
+                      <img
+                        src={coverPreview}
+                        alt="Cover preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BookOpen className="w-10 h-10 text-purple-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-800 truncate">
+                      {bookData.title}
+                    </h3>
+                    <p className="text-sm text-slate-500 mb-1">{bookData.author}</p>
+                    {bookData.description && (
+                      <p className="text-xs text-slate-400 line-clamp-3">
+                        {bookData.description}
+                      </p>
+                    )}
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={reset}
+                        disabled={isUploading}
+                        className="px-3 py-1.5 rounded-lg border border-purple-200 text-purple-600 text-xs font-medium hover:bg-purple-50 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        Change
+                      </button>
+                      <button
+                        onClick={handleUpload}
+                        disabled={isUploading}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-lavender-600 text-white text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-all cursor-pointer"
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Upload className="w-3 h-3" />
+                        )}
+                        {isUploading ? "Uploading..." : "Upload"}
+                      </button>
                     </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-slate-800 truncate">
-                    {bookData.title}
-                  </h3>
-                  <p className="text-sm text-slate-500 mb-1">{bookData.author}</p>
-                  {bookData.description && (
-                    <p className="text-xs text-slate-400 line-clamp-3">
-                      {bookData.description}
-                    </p>
-                  )}
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={reset}
-                      className="px-3 py-1.5 rounded-lg border border-purple-200 text-purple-600 text-xs font-medium hover:bg-purple-50 transition-colors cursor-pointer"
-                    >
-                      Change
-                    </button>
-                    <button
-                      onClick={handleUpload}
-                      disabled={isUploading}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-lavender-600 text-white text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-all cursor-pointer"
-                    >
-                      {isUploading ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Upload className="w-3 h-3" />
-                      )}
-                      {isUploading ? "Uploading..." : "Upload"}
-                    </button>
                   </div>
                 </div>
+
+                {/* Upload Progress Bar */}
+                {uploadProgress && isUploading && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500">
+                        {STAGE_LABELS[uploadProgress.stage]}
+                      </span>
+                      <span className="text-xs font-mono text-purple-600">
+                        {uploadProgress.percentage}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-purple-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-400 to-lavender-500 transition-all duration-500 ease-out rounded-full"
+                        style={{ width: `${uploadProgress.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Error */}
             {error && (
-              <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-600">
-                {error}
+              <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-600 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
           </div>

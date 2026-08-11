@@ -8,6 +8,14 @@ import {
   saveReaderSettings,
   type ReaderSettings,
 } from "@/lib/reader-settings";
+import { enqueue, initOfflineSync } from "@/lib/offline-queue";
+import {
+  getBookmarks,
+  getHighlights,
+  addBookmark as addBookmarkAction,
+  removeBookmark as removeBookmarkAction,
+  addHighlight as addHighlightAction,
+} from "@/app/actions/reader.actions";
 import { ReaderToolbar, type NavItem, type BookmarkData, type HighlightData } from "./reader-toolbar";
 import { DictionaryPopover } from "./dictionary-popover";
 import { HighlightActionBar } from "./highlight-action-bar";
@@ -49,29 +57,36 @@ export function EpubReader({
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
+  // We still need the Supabase client for Realtime subscriptions (client-only)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (!supabaseRef.current && typeof window !== "undefined") {
     supabaseRef.current = createClient();
   }
   const supabase = supabaseRef.current!;
 
-  // Load Bookmarks & Highlights
+  // Initialize offline sync listener once
+  useEffect(() => {
+    initOfflineSync();
+  }, []);
+
+  // Load Bookmarks & Highlights via Server Actions
   useEffect(() => {
     async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const [bmRes, hlRes] = await Promise.all([
-        supabase.from("bookmarks").select("*").eq("book_id", bookId).eq("user_id", user.id).order("created_at", { ascending: false }),
-        supabase.from("highlights").select("*").eq("book_id", bookId).eq("user_id", user.id).order("created_at", { ascending: false }),
-      ]);
-      if (bmRes.data) setBookmarks(bmRes.data);
-      if (hlRes.data) setHighlights(hlRes.data);
+      try {
+        const [bm, hl] = await Promise.all([
+          getBookmarks(bookId),
+          getHighlights(bookId),
+        ]);
+        setBookmarks(bm);
+        setHighlights(hl);
+      } catch (err) {
+        console.error("Failed to load bookmarks/highlights:", err);
+      }
     }
     loadData();
-  }, [bookId, supabase]);
+  }, [bookId]);
 
-  // Real-time Sync Subscription
+  // Real-time Sync Subscription (must stay client-side)
   useEffect(() => {
     const channel = supabase
       .channel(`sync_${bookId}`)
@@ -81,9 +96,8 @@ export function EpubReader({
         (payload) => {
           const newData = payload.new as any;
           if (newData.current_cfi && newData.current_cfi !== currentCfi) {
-            // Check if the update is from another session (time check)
             const timeDiff = new Date().getTime() - new Date(newData.last_read_at).getTime();
-            if (timeDiff < 10000) { // If updated in the last 10 seconds
+            if (timeDiff < 10000) {
               setSyncPrompt({ cfi: newData.current_cfi, date: newData.last_read_at });
             }
           }
@@ -122,46 +136,36 @@ export function EpubReader({
     }
   }, []);
 
-  // Save progress to database (debounced)
+  // Save progress via offline queue (debounced)
   const saveProgress = useCallback((cfi: string, pct: number) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      await supabase
-        .from("user_books")
-        .update({
-          current_cfi: cfi,
-          progress_percentage: Math.min(pct, 100),
-          last_read_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id)
-        .eq("book_id", bookId);
+      await enqueue({
+        type: "syncProgress",
+        args: { bookId, cfi, progressPercentage: Math.min(pct, 100) },
+      });
     }, 3000);
-  }, [bookId, supabase]);
+  }, [bookId]);
 
-  // Log reading session on unmount
+  // Log reading session on unmount via offline queue
   const logSession = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
     const endTime = new Date();
     const durationMs = endTime.getTime() - sessionStartRef.current.getTime();
     const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
 
     if (durationMs < 30000) return;
 
-    await supabase.from("reading_sessions").insert({
-      user_id: user.id,
-      book_id: bookId,
-      session_date: new Date().toISOString().split("T")[0],
-      start_time: sessionStartRef.current.toISOString(),
-      end_time: endTime.toISOString(),
-      duration_minutes: durationMinutes,
-      chapter_name: chapter || null,
+    await enqueue({
+      type: "logSession",
+      args: {
+        bookId,
+        startTime: sessionStartRef.current.toISOString(),
+        endTime: endTime.toISOString(),
+        durationMinutes,
+        chapterName: chapter || null,
+      },
     });
-  }, [bookId, chapter, supabase]);
+  }, [bookId, chapter]);
 
   // Initialize epub.js
   useEffect(() => {
@@ -201,7 +205,7 @@ export function EpubReader({
       const location = args[0] as { start: { cfi: string; displayed: { page: number; total: number } }; atEnd: boolean };
       const cfi = location.start.cfi;
       setCurrentCfi(cfi);
-      setSelection(null); // Clear selection on navigate
+      setSelection(null);
 
       if (book.locations.length() > 0) {
         const pct = book.locations.percentageFromCfi(cfi) * 100;
@@ -209,7 +213,7 @@ export function EpubReader({
         saveProgress(cfi, pct);
       }
 
-      // Re-apply highlights after relocating (safest place to apply them)
+      // Re-apply highlights after relocating
       setTimeout(() => {
         highlights.forEach(hl => {
           try {
@@ -246,9 +250,8 @@ export function EpubReader({
       });
     }));
 
-    // Iframe clicks (events inside the epub don't bubble to the parent div)
-    rendition.on("click", (e: any) => {
-      // In scrolled mode, clicks always toggle the toolbar rather than turning pages
+    // Iframe clicks
+    rendition.on("click", () => {
       setShowToolbar(prev => !prev);
     });
 
@@ -275,7 +278,7 @@ export function EpubReader({
       rendition.destroy();
       book.destroy();
     };
-  }, [epubUrl]); // Only re-render when epubUrl changes
+  }, [epubUrl]);
 
   const updateSettings = (newSettings: Partial<ReaderSettings>) => {
     const updated = { ...settings, ...newSettings };
@@ -297,47 +300,63 @@ export function EpubReader({
       setDictionaryWord(null);
       return;
     }
-
-    // Since we are always scrolling now, any tap toggles the toolbar
     setShowToolbar(!showToolbar);
   };
 
-  // Actions
-  const handleToggleBookmark = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  // ─── Actions (now via Server Actions / Offline Queue) ────────
 
+  const handleToggleBookmark = async () => {
     const existing = bookmarks.find(b => b.cfi === currentCfi);
     if (existing) {
-      await supabase.from("bookmarks").delete().eq("id", existing.id);
-      setBookmarks(bookmarks.filter(b => b.id !== existing.id));
+      try {
+        await removeBookmarkAction(existing.id);
+        setBookmarks(bookmarks.filter(b => b.id !== existing.id));
+      } catch (err) {
+        console.error("Failed to remove bookmark:", err);
+      }
     } else {
-      const { data } = await supabase.from("bookmarks").insert({
-        user_id: user.id,
-        book_id: bookId,
-        cfi: currentCfi,
-        label: chapter || "Bookmark",
-      }).select().single();
-      
-      if (data) setBookmarks([data, ...bookmarks]);
+      try {
+        const data = await addBookmarkAction(bookId, currentCfi, chapter || "Bookmark");
+        if (data) setBookmarks([data, ...bookmarks]);
+      } catch (err) {
+        // If offline, queue it and add optimistically
+        await enqueue({
+          type: "addBookmark",
+          args: { bookId, cfi: currentCfi, label: chapter || "Bookmark" },
+        });
+        setBookmarks([{
+          id: crypto.randomUUID(),
+          cfi: currentCfi,
+          label: chapter || "Bookmark",
+          created_at: new Date().toISOString(),
+        }, ...bookmarks]);
+      }
     }
   };
 
   const handleAddHighlight = async (color: string) => {
     if (!selection) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const textSnippet = selection.text.slice(0, 100);
 
-    const { data } = await supabase.from("highlights").insert({
-      user_id: user.id,
-      book_id: bookId,
-      cfi_range: selection.cfiRange,
-      color,
-      note: selection.text.slice(0, 100), // using note as snippet storage for now
-    }).select().single();
-
-    if (data) {
-      setHighlights([{ ...data, text: selection.text }, ...highlights]);
+    try {
+      const data = await addHighlightAction(bookId, selection.cfiRange, color, textSnippet);
+      if (data) {
+        setHighlights([{ ...data, text: selection.text }, ...highlights]);
+      }
+    } catch (err) {
+      // If offline, queue it and add optimistically
+      await enqueue({
+        type: "addHighlight",
+        args: { bookId, cfiRange: selection.cfiRange, color, note: textSnippet },
+      });
+      setHighlights([{
+        id: crypto.randomUUID(),
+        cfi_range: selection.cfiRange,
+        color,
+        note: textSnippet,
+        text: selection.text,
+        created_at: new Date().toISOString(),
+      }, ...highlights]);
     }
     setSelection(null);
   };
@@ -359,21 +378,18 @@ export function EpubReader({
         
         let idx = text.indexOf(q);
         while (idx !== -1) {
-          // Extract snippet
           const start = Math.max(0, idx - 40);
           const end = Math.min(text.length, idx + q.length + 40);
           let excerpt = item.document.body.textContent?.substring(start, end) || "";
-          // Highlight term in excerpt
           const matchRegex = new RegExp(query, 'gi');
           excerpt = excerpt.replace(matchRegex, (match: string) => `<strong class="text-purple-400">${match}</strong>`);
           
-          // Generate CFI for this match (rough approximation for search results)
           const cfi = item.cfiFromElement(item.document.body);
           
           results.push({ cfi, excerpt: `...${excerpt}...` });
           
           idx = text.indexOf(q, idx + q.length);
-          if (results.length > 50) break; // Limit
+          if (results.length > 50) break;
         }
         item.unload();
       }
@@ -409,7 +425,7 @@ export function EpubReader({
           y={selection.y}
           onHighlight={handleAddHighlight}
           onDefine={() => {
-            const word = selection.text.trim().split(" ")[0]; // Take first word
+            const word = selection.text.trim().split(" ")[0];
             setDictionaryWord({ word, x: selection.x, y: selection.y });
             setSelection(null);
           }}

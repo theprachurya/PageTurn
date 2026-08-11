@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getCachedEpub, cacheEpub } from "@/lib/epub-cache";
 import { EpubReader } from "@/components/reader/epub-reader";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -14,6 +15,7 @@ export default function ReadPage() {
   const [initialCfi, setInitialCfi] = useState<string | null>(null);
   const [initialProgress, setInitialProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState("Loading your book...");
   const [error, setError] = useState<string | null>(null);
   const supabaseRef = useRef<SupabaseClient | null>(null);
   if (!supabaseRef.current && typeof window !== "undefined") {
@@ -35,34 +37,52 @@ export default function ReadPage() {
         return;
       }
 
-      // Fetch book record
-      const { data: book, error: bookError } = await supabase
-        .from("books")
-        .select("*")
-        .eq("id", bookId)
-        .eq("user_id", user.id)
-        .single();
+      // 1. Try IndexedDB cache first
+      setLoadingStatus("Checking local cache...");
+      const cached = await getCachedEpub(bookId);
 
-      if (bookError || !book) {
-        setError("Book not found");
-        setLoading(false);
-        return;
+      let arrayBuffer: ArrayBuffer;
+
+      if (cached) {
+        setLoadingStatus("Loading from cache...");
+        arrayBuffer = cached;
+      } else {
+        // 2. Fetch book record from Supabase
+        setLoadingStatus("Fetching book info...");
+        const { data: book, error: bookError } = await supabase
+          .from("books")
+          .select("*")
+          .eq("id", bookId)
+          .eq("user_id", user.id)
+          .single();
+
+        if (bookError || !book) {
+          setError("Book not found");
+          setLoading(false);
+          return;
+        }
+
+        // 3. Download EPUB from Supabase Storage
+        setLoadingStatus("Downloading book...");
+        const { data: blob, error: downloadError } = await supabase.storage
+          .from("epubs")
+          .download(book.epub_path);
+
+        if (downloadError || !blob) {
+          setError("Could not download EPUB file");
+          setLoading(false);
+          return;
+        }
+
+        arrayBuffer = await blob.arrayBuffer();
+
+        // 4. Cache in IndexedDB for offline use
+        setLoadingStatus("Caching for offline...");
+        await cacheEpub(bookId, arrayBuffer);
       }
 
-      // Download EPUB file directly to avoid epub.js URL parsing issues
-      const { data: blob, error: downloadError } = await supabase.storage
-        .from("epubs")
-        .download(book.epub_path);
-
-      if (downloadError || !blob) {
-        setError("Could not download EPUB file");
-        setLoading(false);
-        return;
-      }
-
-      const arrayBuffer = await blob.arrayBuffer();
-
-      // Fetch reading progress
+      // 5. Fetch reading progress
+      setLoadingStatus("Restoring your position...");
       const { data: userBook } = await supabase
         .from("user_books")
         .select("current_cfi, progress_percentage")
@@ -88,7 +108,7 @@ export default function ReadPage() {
       <div className="fixed inset-0 flex items-center justify-center bg-white">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-slate-500">Loading your book...</p>
+          <p className="text-sm text-slate-500">{loadingStatus}</p>
         </div>
       </div>
     );
