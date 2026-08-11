@@ -3,14 +3,16 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LogOut, Save, Target, User as UserIcon, Loader2 } from "lucide-react";
+import { LogOut, Save, Target, User as UserIcon, Loader2, Download } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { exportAllUserData } from "@/app/actions/stats.actions";
 
 export default function SettingsPage() {
   const [dailyGoal, setDailyGoal] = useState(60);
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabaseRef = useRef<SupabaseClient | null>(null);
@@ -61,6 +63,27 @@ export default function SettingsPage() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/");
+  };
+
+  const handleExportData = async () => {
+    setExporting(true);
+    try {
+      const data = await exportAllUserData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pageturn-export-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export data:", err);
+      alert("Failed to export data. Please try again.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (loading) {
@@ -139,6 +162,36 @@ export default function SettingsPage() {
               <Save className="w-4 h-4" />
             )}
             {saved ? "Saved ✓" : "Save Changes"}
+          </button>
+        </div>
+      </div>
+
+      {/* Data Section */}
+      <div className="rounded-3xl bg-white border border-purple-100/50 p-6 shadow-sm mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Download className="w-5 h-5 text-purple-500" />
+          <h2 className="text-lg font-semibold text-slate-800">
+            Export Data
+          </h2>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-slate-500 mb-4">
+              Download a complete JSON backup of your account data, including your reading history, shelves, tags, bookmarks, and highlights.
+            </p>
+          </div>
+
+          <button
+            onClick={handleExportData}
+            disabled={exporting}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-medium text-sm hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {exporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            {exporting ? "Exporting..." : "Export to JSON"}
           </button>
         </div>
       </div>

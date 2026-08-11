@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Library, History, Settings } from "lucide-react";
+import { BookOpen, Library, History, Settings, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/shelf", label: "Shelf", icon: BookOpen },
   { href: "/library", label: "Library", icon: Library },
   { href: "/history", label: "History", icon: History },
+  { href: "/stats", label: "Stats", icon: Activity },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

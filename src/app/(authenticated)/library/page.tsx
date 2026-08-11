@@ -2,9 +2,12 @@
 
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutGrid, List, Filter, Tag as TagIcon, Library, Clock, Book, CheckCircle } from "lucide-react";
+import { LayoutGrid, List, Filter, Tag as TagIcon, Library, Clock, Book, CheckCircle, Search, ArrowDownAZ } from "lucide-react";
 import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
 import { BookUploader } from "@/components/upload/book-uploader";
+import { ShelvesSidebar } from "@/components/library/shelves-sidebar";
+import { ManageCollectionsDialog } from "@/components/library/manage-collections-dialog";
+import { AIRecapDialog } from "@/components/library/ai-recap-dialog";
 import { cn } from "@/lib/utils";
 import { updateReadingStatus, type BookStatus } from "@/app/actions/library.actions";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -15,8 +18,19 @@ export default function LibraryPage() {
   const [books, setBooks] = useState<BookData[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
   
+  // Filtering & Sorting State
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"recent" | "title" | "progress" | "added">("recent");
+  const [activeShelfId, setActiveShelfId] = useState<string | null>(null);
+  const [activeTagId, setActiveTagId] = useState<string | null>(null);
+  const [allUserTags, setAllUserTags] = useState<{id: string, name: string}[]>([]);
+  
+  // Dialog state
+  const [managingCollectionsForBook, setManagingCollectionsForBook] = useState<{ id: string, title: string, tags: BookTag[], shelves: BookShelf[] } | null>(null);
+  const [recapBook, setRecapBook] = useState<{ id: string, title: string, cfi?: string | null } | null>(null);
+
   const supabaseRef = useRef<SupabaseClient | null>(null);
   if (!supabaseRef.current && typeof window !== "undefined") {
     supabaseRef.current = createClient();
@@ -42,7 +56,7 @@ export default function LibraryPage() {
       .eq("user_id", user.id)
       .order("last_read_at", { ascending: false });
 
-    // 2. Fetch tags mapping
+    // 2. Fetch tags mapping and all user tags
     const { data: tagsData } = await supabase
       .from("book_tags")
       .select(`
@@ -50,6 +64,14 @@ export default function LibraryPage() {
         tags (id, name, color)
       `)
       .eq("user_id", user.id);
+
+    const { data: userTagsData } = await supabase
+      .from("tags")
+      .select("id, name")
+      .eq("user_id", user.id)
+      .order("name");
+      
+    if (userTagsData) setAllUserTags(userTagsData);
 
     // 3. Fetch shelves mapping
     const { data: shelvesData } = await supabase
@@ -126,9 +148,34 @@ export default function LibraryPage() {
     }
   };
 
-  const filteredBooks = books.filter(b => {
+  let filteredBooks = books.filter(b => {
     if (statusFilter !== "all" && b.status !== statusFilter) return false;
+    if (activeShelfId && !(b.shelves || []).some(s => s.id === activeShelfId)) return false;
+    if (activeTagId && !(b.tags || []).some(t => t.id === activeTagId)) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!b.title.toLowerCase().includes(q) && !(b.author && b.author.toLowerCase().includes(q))) {
+        return false;
+      }
+    }
     return true;
+  });
+
+  filteredBooks = filteredBooks.sort((a, b) => {
+    switch (sortBy) {
+      case "title":
+        return a.title.localeCompare(b.title);
+      case "progress":
+        return b.progress_percentage - a.progress_percentage;
+      case "recent":
+        const timeA = a.last_read_at ? new Date(a.last_read_at).getTime() : 0;
+        const timeB = b.last_read_at ? new Date(b.last_read_at).getTime() : 0;
+        return timeB - timeA;
+      case "added":
+      default:
+        // Assume ID or another proxy for added time. user_books created_at is ideal but we don't have it in state, so fallback to recent.
+        return 0;
+    }
   });
 
   if (loading) {
@@ -179,29 +226,78 @@ export default function LibraryPage() {
           </div>
           
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3 px-3">
               <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tags</h2>
             </div>
-            <p className="text-xs text-slate-500 italic px-3">Coming soon...</p>
+            {allUserTags.length > 0 ? (
+              <div className="flex flex-wrap gap-2 px-3">
+                {allUserTags.map(tag => (
+                  <button
+                    key={tag.id}
+                    onClick={() => setActiveTagId(activeTagId === tag.id ? null : tag.id)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer",
+                      activeTagId === tag.id
+                        ? "bg-purple-100 border-purple-200 text-purple-700" 
+                        : "bg-white border-slate-200 text-slate-600 hover:border-purple-300"
+                    )}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 italic px-3">No tags yet</p>
+            )}
           </div>
+          
+          <ShelvesSidebar activeShelfId={activeShelfId} onSelectShelf={setActiveShelfId} />
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 min-w-0">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-800 mb-1">
-              {statusFilter === "all" ? "All Books" : statusFilter === "reading" ? "Currently Reading" : statusFilter === "plan_to_read" ? "Want to Read" : "Finished"}
+              {activeShelfId 
+                ? "Shelf View" 
+                : statusFilter === "all" ? "All Books" : statusFilter === "reading" ? "Currently Reading" : statusFilter === "plan_to_read" ? "Want to Read" : "Finished"}
             </h1>
             <p className="text-slate-500">
               {filteredBooks.length} {filteredBooks.length === 1 ? "book" : "books"}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            {/* Search */}
+            <div className="relative flex-1 lg:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search library..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+              />
+            </div>
+            
+            {/* Sort */}
+            <div className="relative">
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white cursor-pointer"
+              >
+                <option value="recent">Recently Opened</option>
+                <option value="title">Title</option>
+                <option value="progress">Progress</option>
+              </select>
+              <ArrowDownAZ className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+
             {/* View Toggle */}
-            <div className="hidden sm:flex items-center bg-purple-50 rounded-xl p-1">
+            <div className="hidden sm:flex items-center bg-purple-50 rounded-xl p-1 shrink-0">
               <button
                 onClick={() => setViewMode("grid")}
                 className={cn(
@@ -221,7 +317,9 @@ export default function LibraryPage() {
                 <List className="w-4 h-4" />
               </button>
             </div>
-            <BookUploader onUploadComplete={fetchLibraryData} />
+            <div className="shrink-0">
+              <BookUploader onUploadComplete={fetchLibraryData} />
+            </div>
           </div>
         </div>
 
@@ -243,7 +341,11 @@ export default function LibraryPage() {
                 variant="grid" 
                 onDelete={handleDelete}
                 onUpdateStatus={handleUpdateStatus}
-                onManageTags={(id) => alert(`Manage tags for ${id} (Coming soon)`)}
+                onManageTags={(id) => {
+                  const b = books.find(x => x.book_id === id);
+                  if (b) setManagingCollectionsForBook({ id: b.book_id, title: b.title, tags: b.tags || [], shelves: b.shelves || [] });
+                }}
+                onAIRecap={(book) => setRecapBook({ id: book.book_id, title: book.title, cfi: book.current_cfi })}
               />
             ))}
           </div>
@@ -256,10 +358,34 @@ export default function LibraryPage() {
                 variant="list" 
                 onDelete={handleDelete}
                 onUpdateStatus={handleUpdateStatus}
-                onManageTags={(id) => alert(`Manage tags for ${id} (Coming soon)`)}
+                onManageTags={(id) => {
+                  const b = books.find(x => x.book_id === id);
+                  if (b) setManagingCollectionsForBook({ id: b.book_id, title: b.title, tags: b.tags || [], shelves: b.shelves || [] });
+                }}
+                onAIRecap={(book) => setRecapBook({ id: book.book_id, title: book.title, cfi: book.current_cfi })}
               />
             ))}
           </div>
+        )}
+        
+        {managingCollectionsForBook && (
+          <ManageCollectionsDialog
+            bookId={managingCollectionsForBook.id}
+            bookTitle={managingCollectionsForBook.title}
+            initialTags={managingCollectionsForBook.tags}
+            initialShelves={managingCollectionsForBook.shelves}
+            onClose={() => setManagingCollectionsForBook(null)}
+            onUpdate={fetchLibraryData}
+          />
+        )}
+        
+        {recapBook && (
+          <AIRecapDialog
+            bookId={recapBook.id}
+            bookTitle={recapBook.title}
+            currentCfi={recapBook.cfi}
+            onClose={() => setRecapBook(null)}
+          />
         )}
       </main>
     </div>

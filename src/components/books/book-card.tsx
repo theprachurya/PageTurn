@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, MoreVertical, Trash2, CheckCircle, Book, Clock } from "lucide-react";
+import { BookOpen, MoreVertical, Trash2, CheckCircle, Book, Clock, Folder, Sparkles } from "lucide-react";
 import { ProgressRing } from "./progress-ring";
 import { cn } from "@/lib/utils";
 import type { BookStatus } from "@/app/actions/library.actions";
@@ -39,6 +39,7 @@ interface BookCardProps {
   onDelete?: (bookId: string) => void;
   onUpdateStatus?: (bookId: string, status: BookStatus) => void;
   onManageTags?: (bookId: string) => void;
+  onAIRecap?: (book: BookData) => void;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
@@ -47,7 +48,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }>
   completed: { label: "Completed", icon: CheckCircle, color: "text-emerald-600 bg-emerald-50" },
 };
 
-export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onManageTags }: BookCardProps) {
+export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onManageTags, onAIRecap }: BookCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const toggleMenu = (e: React.MouseEvent) => {
@@ -75,6 +76,13 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onM
     e.stopPropagation();
     setMenuOpen(false);
     onManageTags?.(book.book_id);
+  };
+
+  const handleAIRecap = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuOpen(false);
+    onAIRecap?.(book);
   };
 
   // Click away listener equivalent - since this is a simple custom dropdown, 
@@ -183,8 +191,11 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onM
               
               <div className="h-px bg-slate-100 my-1" />
               
-              <button onClick={handleManageTags} className="w-full text-left px-3 py-1.5 text-sm text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-colors cursor-pointer">
-                Manage Tags...
+              <button onClick={handleAIRecap} className="w-full text-left px-3 py-1.5 text-sm text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-colors cursor-pointer flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5" /> AI Recap
+              </button>
+              <button onClick={handleManageTags} className="w-full text-left px-3 py-1.5 text-sm text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-colors cursor-pointer flex items-center gap-2">
+                <Folder className="w-3.5 h-3.5" /> Organize...
               </button>
               <button onClick={handleDelete} className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-2">
                 <Trash2 className="w-3.5 h-3.5" /> Remove
@@ -250,8 +261,11 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onM
               <CheckCircle className="w-3.5 h-3.5" /> Completed
             </button>
             <div className="h-px bg-slate-100 my-1" />
-            <button onClick={handleManageTags} className="w-full text-left px-3 py-1.5 text-sm text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-colors cursor-pointer">
-              Manage Tags...
+            <button onClick={handleAIRecap} className="w-full text-left px-3 py-1.5 text-sm text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-colors cursor-pointer flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5" /> AI Recap
+            </button>
+            <button onClick={handleManageTags} className="w-full text-left px-3 py-1.5 text-sm text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-colors cursor-pointer flex items-center gap-2">
+              <Folder className="w-3.5 h-3.5" /> Organize...
             </button>
             <button onClick={handleDelete} className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-2">
               <Trash2 className="w-3.5 h-3.5" /> Remove

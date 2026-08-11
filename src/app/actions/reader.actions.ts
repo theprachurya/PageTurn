@@ -35,7 +35,8 @@ export async function logReadingSession(
   startTime: string,
   endTime: string,
   durationMinutes: number,
-  chapterName: string | null
+  chapterName: string | null,
+  wordsRead: number = 0
 ) {
   const supabase = await createClient();
   const {
@@ -53,6 +54,7 @@ export async function logReadingSession(
     end_time: endTime,
     duration_minutes: durationMinutes,
     chapter_name: chapterName,
+    words_read: wordsRead,
   });
 
   if (error) throw new Error(`Failed to log session: ${error.message}`);

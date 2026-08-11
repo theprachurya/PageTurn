@@ -11,14 +11,13 @@ import {
 import { enqueue, initOfflineSync } from "@/lib/offline-queue";
 import {
   getBookmarks,
-  getHighlights,
   addBookmark as addBookmarkAction,
   removeBookmark as removeBookmarkAction,
-  addHighlight as addHighlightAction,
 } from "@/app/actions/reader.actions";
 import { ReaderToolbar, type NavItem, type BookmarkData, type HighlightData } from "./reader-toolbar";
 import { DictionaryPopover } from "./dictionary-popover";
-import { HighlightActionBar } from "./highlight-action-bar";
+import { HighlightPopover, type HighlightColor } from "./highlight-popover";
+import { useHighlights } from "@/lib/hooks/use-highlights";
 
 interface EpubReaderProps {
   bookId: string;
@@ -44,14 +43,24 @@ export function EpubReader({
   const [chapter, setChapter] = useState("");
   const [toc, setToc] = useState<NavItem[]>([]);
   const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings());
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
+  const sessionWordsReadRef = useRef<number>(0);
+  const wpmRef = useRef<number>(250); // Default average WPM
   
   // Phase 1 State
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
-  const [highlights, setHighlights] = useState<HighlightData[]>([]);
   const [searchResults, setSearchResults] = useState<{ cfi: string; excerpt: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   
+  const { highlights, addHighlight, removeHighlight, updateHighlightNote } = useHighlights(bookId);
+
   const [selection, setSelection] = useState<{ cfiRange: string; text: string; x: number; y: number } | null>(null);
+  const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
+  const [activeHighlightPos, setActiveHighlightPos] = useState<{ x: number, y: number } | null>(null);
+  
+  const [isReadingAloud, setIsReadingAloud] = useState(false);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  
   const [dictionaryWord, setDictionaryWord] = useState<{ word: string; x: number; y: number } | null>(null);
   const [syncPrompt, setSyncPrompt] = useState<{ cfi: string; date: string } | null>(null);
 
@@ -69,18 +78,14 @@ export function EpubReader({
     initOfflineSync();
   }, []);
 
-  // Load Bookmarks & Highlights via Server Actions
+  // Load Bookmarks via Server Actions
   useEffect(() => {
     async function loadData() {
       try {
-        const [bm, hl] = await Promise.all([
-          getBookmarks(bookId),
-          getHighlights(bookId),
-        ]);
+        const bm = await getBookmarks(bookId);
         setBookmarks(bm);
-        setHighlights(hl);
       } catch (err) {
-        console.error("Failed to load bookmarks/highlights:", err);
+        console.error("Failed to load bookmarks:", err);
       }
     }
     loadData();
@@ -175,6 +180,7 @@ export function EpubReader({
         endTime: endTime.toISOString(),
         durationMinutes,
         chapterName: chapter || null,
+        wordsRead: sessionWordsReadRef.current,
       },
     });
   }, [bookId, chapter]);
@@ -243,7 +249,29 @@ export function EpubReader({
           try {
             rendition.annotations.highlight(hl.cfi_range, {}, () => {}, "", { fill: hl.color, "fill-opacity": "0.3" });
           } catch (e) { }
-        });
+          // Calculate words on screen for WPM estimation
+      try {
+        const range = (rendition as any).getRange(location.start.cfi);
+        // getRange only gets a single node usually, but we can roughly estimate words per page
+        // A standard screen page has ~250 words
+        sessionWordsReadRef.current += 250;
+        
+        // Update rolling WPM estimation if they've been reading for at least a minute
+        const elapsedMinutes = (new Date().getTime() - sessionStartRef.current.getTime()) / 60000;
+        if (elapsedMinutes > 1) {
+          wpmRef.current = Math.max(100, Math.min(1000, Math.round(sessionWordsReadRef.current / elapsedMinutes)));
+        }
+
+        // Estimate remaining time in book based on progress
+        const remainingProgress = 1 - (progress / 100);
+        // If we assume a typical book has 80,000 words:
+        const assumedTotalWords = 80000;
+        const remainingWords = assumedTotalWords * remainingProgress;
+        setEstimatedTimeRemaining(Math.round(remainingWords / wpmRef.current));
+      } catch (e) {
+        console.warn("Failed to calculate words", e);
+      }
+    });
       }, 100);
     }));
 
@@ -272,7 +300,25 @@ export function EpubReader({
         x: rect.left + rect.width / 2,
         y: rect.top,
       });
+      setActiveHighlightId(null);
     }));
+
+    // Existing Highlight Click
+    rendition.on("markClicked", (cfiRange: any, data: any, contents: any) => {
+      const highlight = highlights.find(h => h.cfi_range === cfiRange);
+      if (highlight) {
+        setActiveHighlightId(highlight.id);
+        
+        // Try to get position of click event or use generic center
+        try {
+          const rect = contents.window.getSelection()?.getRangeAt(0)?.getBoundingClientRect() 
+            || { left: window.innerWidth / 2, top: window.innerHeight / 2 };
+          setActiveHighlightPos({ x: rect.left, y: rect.top });
+        } catch(e) {
+          setActiveHighlightPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+        }
+      }
+    });
 
     // Iframe clicks (only toggle on pure left clicks, not selections or middle clicks)
     rendition.on("click", (e: any) => {
@@ -369,31 +415,62 @@ export function EpubReader({
     }
   };
 
-  const handleAddHighlight = async (color: string) => {
+  const handleSaveHighlight = async (color: HighlightColor, note?: string) => {
     if (!selection) return;
-    const textSnippet = selection.text.slice(0, 100);
 
     try {
-      const data = await addHighlightAction(bookId, selection.cfiRange, color, textSnippet);
-      if (data) {
-        setHighlights([{ ...data, text: selection.text }, ...highlights]);
-      }
-    } catch (err) {
-      // If offline, queue it and add optimistically
-      await enqueue({
-        type: "addHighlight",
-        args: { bookId, cfiRange: selection.cfiRange, color, note: textSnippet },
-      });
-      setHighlights([{
-        id: crypto.randomUUID(),
+      const newHighlight = await addHighlight({
+        book_id: bookId,
         cfi_range: selection.cfiRange,
         color,
-        note: textSnippet,
+        note,
         text: selection.text,
-        created_at: new Date().toISOString(),
-      }, ...highlights]);
+      });
+
+      if (newHighlight && renditionRef.current) {
+        // Optimistically apply it to iframe
+        try {
+          renditionRef.current.annotations.highlight(
+            selection.cfiRange,
+            {},
+            () => {},
+            "",
+            { fill: color, "fill-opacity": "0.3" }
+          );
+        } catch (e) {
+          console.error("Failed to apply highlight in rendition", e);
+        }
+      }
+    } catch (err) {
+      console.error("Highlight save failed", err);
     }
+
+    // Clear selection
     setSelection(null);
+    if (viewerRef.current) {
+      const iframe = viewerRef.current.querySelector("iframe");
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.getSelection()?.removeAllRanges();
+      }
+    }
+  };
+
+  const handleUpdateExistingHighlight = async (color: HighlightColor, note?: string) => {
+    if (activeHighlightId && note !== undefined) {
+      await updateHighlightNote(activeHighlightId, note);
+    }
+    setActiveHighlightId(null);
+  };
+
+  const handleDeleteHighlight = async () => {
+    if (activeHighlightId) {
+      const highlight = highlights.find(h => h.id === activeHighlightId);
+      if (highlight && renditionRef.current) {
+        renditionRef.current.annotations.remove(highlight.cfi_range, "highlight");
+      }
+      await removeHighlight(activeHighlightId);
+    }
+    setActiveHighlightId(null);
   };
 
   const handleSearch = async (query: string) => {
@@ -436,6 +513,51 @@ export function EpubReader({
     }
   };
 
+  const handleToggleTTS = async () => {
+    if (isReadingAloud) {
+      window.speechSynthesis.cancel();
+      setIsReadingAloud(false);
+    } else {
+      try {
+        const location = (renditionRef.current as any)?.location;
+        if (!location || !bookRef.current) return;
+        
+        // Grab the current chapter's DOM
+        const iframe = viewerRef.current?.querySelector("iframe");
+        let text = "";
+        if (iframe?.contentDocument) {
+           text = iframe.contentDocument.body.innerText;
+        } else {
+           const spineItem = (bookRef.current as any).spine.get(location.start.cfi);
+           if (spineItem && (spineItem as any).document) {
+             text = (spineItem as any).document.body.innerText;
+           }
+        }
+        
+        if (!text) {
+          alert("Could not extract text for Read Aloud.");
+          return;
+        }
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.onend = () => setIsReadingAloud(false);
+        utteranceRef.current = utterance;
+        
+        window.speechSynthesis.speak(utterance);
+        setIsReadingAloud(true);
+      } catch (e) {
+        console.error("TTS Error", e);
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+    };
+  }, []);
+
   const bgColors = { light: "bg-white", dark: "bg-[#1a1a2e]", sepia: "bg-[#f4ecd8]" };
   const isBookmarked = bookmarks.some(b => b.cfi === currentCfi);
 
@@ -455,16 +577,24 @@ export function EpubReader({
 
       {/* Floating Action Bars */}
       {selection && (
-        <HighlightActionBar
+        <HighlightPopover
           x={selection.x}
           y={selection.y}
-          onHighlight={handleAddHighlight}
-          onDefine={() => {
-            const word = selection.text.trim().split(" ")[0];
-            setDictionaryWord({ word, x: selection.x, y: selection.y });
-            setSelection(null);
-          }}
+          onSave={handleSaveHighlight}
           onClose={() => setSelection(null)}
+        />
+      )}
+
+      {activeHighlightId && activeHighlightPos && (
+        <HighlightPopover
+          x={activeHighlightPos.x}
+          y={activeHighlightPos.y}
+          isExisting={true}
+          initialColor={highlights.find(h => h.id === activeHighlightId)?.color as HighlightColor || "yellow"}
+          initialNote={highlights.find(h => h.id === activeHighlightId)?.note || ""}
+          onSave={handleUpdateExistingHighlight}
+          onDelete={handleDeleteHighlight}
+          onClose={() => setActiveHighlightId(null)}
         />
       )}
 
@@ -479,16 +609,19 @@ export function EpubReader({
 
       <ReaderToolbar
         visible={showToolbar}
-        settings={settings}
-        onSettingsChange={updateSettings}
-        chapter={chapter}
+        chapter={chapter || "Unknown Chapter"}
         progress={progress}
         toc={toc}
         bookmarks={bookmarks}
-        highlights={highlights}
+        highlights={highlights as any}
+        estimatedTimeRemaining={estimatedTimeRemaining}
+        settings={settings}
+        onSettingsChange={updateSettings}
         isBookmarked={isBookmarked}
         onNavigate={navigateTo}
         onToggleBookmark={handleToggleBookmark}
+        onToggleTTS={handleToggleTTS}
+        isReadingAloud={isReadingAloud}
         onSearch={handleSearch}
         searchResults={searchResults}
         isSearching={isSearching}

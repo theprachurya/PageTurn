@@ -19,6 +19,8 @@ import {
   Search,
   List,
   MessageSquare,
+  Volume2,
+  Square
 } from "lucide-react";
 import type { ReaderSettings } from "@/lib/reader-settings";
 import { cn } from "@/lib/utils";
@@ -55,9 +57,12 @@ interface ReaderToolbarProps {
   toc: NavItem[];
   bookmarks?: BookmarkData[];
   highlights?: HighlightData[];
+  estimatedTimeRemaining?: number | null;
   isBookmarked: boolean;
   onNavigate: (cfi: string) => void;
   onToggleBookmark: () => void;
+  onToggleTTS: () => void;
+  isReadingAloud: boolean;
   onSearch?: (query: string) => void;
   searchResults?: { cfi: string; excerpt: string }[];
   isSearching?: boolean;
@@ -73,9 +78,12 @@ export function ReaderToolbar({
   toc,
   bookmarks = [],
   highlights = [],
+  estimatedTimeRemaining,
   isBookmarked,
   onNavigate,
   onToggleBookmark,
+  onToggleTTS,
+  isReadingAloud,
   onSearch,
   searchResults = [],
   isSearching = false,
@@ -124,6 +132,13 @@ export function ReaderToolbar({
               className="p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
             >
               <Bookmark className={cn("w-5 h-5", isBookmarked ? "fill-current text-purple-400" : "")} />
+            </button>
+            <button
+              onClick={onToggleTTS}
+              className="p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+              title={isReadingAloud ? "Stop Reading Aloud" : "Read Aloud"}
+            >
+              {isReadingAloud ? <Square className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
             <button
               onClick={onClose}

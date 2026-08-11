@@ -12,7 +12,7 @@ import localforage from "localforage";
 
 export type QueueAction =
   | { type: "syncProgress"; args: { bookId: string; cfi: string; progressPercentage: number } }
-  | { type: "logSession"; args: { bookId: string; startTime: string; endTime: string; durationMinutes: number; chapterName: string | null } }
+  | { type: "logSession"; args: { bookId: string; startTime: string; endTime: string; durationMinutes: number; chapterName: string | null; wordsRead: number } }
   | { type: "addBookmark"; args: { bookId: string; cfi: string; label: string } }
   | { type: "addHighlight"; args: { bookId: string; cfiRange: string; color: string; note: string | null } };
 
@@ -120,6 +120,7 @@ async function executeAction(action: QueueAction): Promise<void> {
         action.args.endTime,
         action.args.durationMinutes,
         action.args.chapterName,
+        action.args.wordsRead
       );
       break;
     case "addBookmark":

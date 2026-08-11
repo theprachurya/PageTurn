@@ -1,4 +1,5 @@
 import ePub from "epubjs";
+import imageCompression from "browser-image-compression";
 
 export interface ExtractedBookData {
   title: string;
@@ -27,10 +28,19 @@ export async function extractEpubMetadata(
       try {
         const coverUrl = await book.archive.createUrl(coverPath);
         const response = await fetch(coverUrl);
-        coverBlob = await response.blob();
+        const originalBlob = await response.blob();
         URL.revokeObjectURL(coverUrl);
-      } catch {
-        console.warn("Could not extract cover image");
+
+        // Compress the image before returning
+        const imageFile = new File([originalBlob], "cover.jpg", { type: originalBlob.type || "image/jpeg" });
+        const compressedFile = await imageCompression(imageFile, {
+          maxSizeMB: 0.2, // Compress to max 200KB
+          maxWidthOrHeight: 600, // Max 600px dimension
+          useWebWorker: true
+        });
+        coverBlob = compressedFile;
+      } catch (err) {
+        console.warn("Could not extract and compress cover image", err);
       }
     }
 
