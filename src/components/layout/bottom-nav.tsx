@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/shelf", label: "Shelf", icon: BookOpen },
   { href: "/library", label: "Library", icon: Library },
+  { href: "/history", label: "History", icon: History },
   { href: "/stats", label: "Stats", icon: Activity },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -16,7 +17,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-purple-100/50 safe-area-bottom">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800/80 safe-area-bottom">
       <div className="flex items-center justify-around px-2 py-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
@@ -25,23 +26,23 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 min-w-[60px]",
+                "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 min-w-[60px] relative",
                 isActive
-                  ? "text-purple-600"
-                  : "text-slate-400 hover:text-purple-500"
+                  ? "text-red-500"
+                  : "text-zinc-500 hover:text-zinc-300"
               )}
             >
-              <item.icon className={cn("w-5 h-5", isActive && "text-purple-600")} />
+              <item.icon className={cn("w-5 h-5", isActive && "text-red-500")} />
               <span
                 className={cn(
                   "text-[10px] font-medium",
-                  isActive && "text-purple-600"
+                  isActive ? "text-red-400 font-semibold" : "text-zinc-500"
                 )}
               >
                 {item.label}
               </span>
               {isActive && (
-                <div className="absolute -bottom-0.5 w-5 h-0.5 bg-purple-500 rounded-full" />
+                <div className="absolute top-0 w-6 h-0.5 bg-red-500 rounded-full" />
               )}
             </Link>
           );
@@ -50,3 +51,4 @@ export function BottomNav() {
     </nav>
   );
 }
+

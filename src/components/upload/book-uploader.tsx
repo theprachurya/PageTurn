@@ -54,14 +54,12 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
   const handleFile = async (file: File) => {
     setError(null);
 
-    // 1. Basic validation (type + size)
     const validationError = validateEpubFile(file);
     if (validationError) {
       setError(validationError);
       return;
     }
 
-    // 2. DRM check
     setIsExtracting(true);
     try {
       const isDrm = await checkForDrm(file);
@@ -71,10 +69,9 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
         return;
       }
     } catch {
-      // If DRM check fails, continue — we'll catch issues later
+      // Continue
     }
 
-    // 3. Extract metadata
     try {
       const extracted = await extractEpubMetadata(file);
       setBookData(extracted);
@@ -119,7 +116,6 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
 
       await uploadBookToSupabase(bookData, user.id, setUploadProgress);
       
-      // Brief delay to show "Done!" state
       await new Promise(resolve => setTimeout(resolve, 800));
       
       handleClose();
@@ -135,7 +131,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-lavender-600 text-white font-medium text-sm shadow-lg shadow-purple-200/50 hover:shadow-purple-300/50 hover:scale-105 transition-all duration-300 cursor-pointer"
+        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-medium text-sm shadow-lg shadow-red-950/60 hover:shadow-red-800/40 hover:scale-[1.02] transition-all duration-300 cursor-pointer border border-red-500/30"
       >
         <Upload className="w-4 h-4" />
         Upload Book
@@ -145,19 +141,19 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/75 backdrop-blur-md animate-fade-in"
             onClick={handleClose}
           />
 
-          <div className="relative bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 animate-slide-up">
+          <div className="relative bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full p-6 animate-slide-up text-zinc-100 z-10">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-slate-800">Upload Book</h2>
+              <h2 className="text-xl font-bold text-zinc-100">Upload Book</h2>
               <button
                 onClick={handleClose}
-                className="p-2 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer"
+                className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5 text-slate-400" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -173,27 +169,27 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                 className={cn(
                   "border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300",
                   isDragging
-                    ? "border-purple-400 bg-purple-50"
-                    : "border-purple-200 hover:border-purple-300 hover:bg-purple-50/50"
+                    ? "border-red-500 bg-red-950/30"
+                    : "border-zinc-800 hover:border-red-900/60 hover:bg-zinc-950/50"
                 )}
               >
                 {isExtracting ? (
                   <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
-                    <p className="text-sm text-purple-500">
+                    <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+                    <p className="text-sm text-red-400">
                       Checking file & extracting metadata...
                     </p>
                   </div>
                 ) : (
                   <>
-                    <BookOpen className="w-12 h-12 text-purple-300 mx-auto mb-4" />
-                    <p className="text-sm text-slate-600 mb-2">
+                    <BookOpen className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
+                    <p className="text-sm text-zinc-300 mb-1 font-medium">
                       Drag & drop your .epub file here
                     </p>
-                    <p className="text-xs text-slate-400 mb-4">Max 100 MB · No DRM</p>
+                    <p className="text-xs text-zinc-500 mb-4">Max 100 MB · No DRM</p>
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 rounded-xl bg-purple-100 text-purple-700 text-sm font-medium hover:bg-purple-200 transition-colors cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-medium hover:bg-zinc-700 hover:text-white transition-colors cursor-pointer"
                     >
                       Browse Files
                     </button>
@@ -211,7 +207,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
               /* Preview */
               <div className="space-y-4">
                 <div className="flex gap-4">
-                  <div className="w-28 h-40 rounded-xl overflow-hidden bg-gradient-to-br from-purple-100 to-lavender-100 flex-shrink-0">
+                  <div className="w-28 h-40 rounded-xl overflow-hidden bg-zinc-950 border border-zinc-800 flex-shrink-0">
                     {coverPreview ? (
                       <img
                         src={coverPreview}
@@ -220,17 +216,17 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="w-10 h-10 text-purple-300" />
+                        <BookOpen className="w-10 h-10 text-zinc-700" />
                       </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-800 truncate">
+                    <h3 className="font-semibold text-zinc-100 truncate">
                       {bookData.title}
                     </h3>
-                    <p className="text-sm text-slate-500 mb-1">{bookData.author}</p>
+                    <p className="text-sm text-zinc-400 mb-1">{bookData.author}</p>
                     {bookData.description && (
-                      <p className="text-xs text-slate-400 line-clamp-3">
+                      <p className="text-xs text-zinc-500 line-clamp-3">
                         {bookData.description}
                       </p>
                     )}
@@ -238,14 +234,14 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                       <button
                         onClick={reset}
                         disabled={isUploading}
-                        className="px-3 py-1.5 rounded-lg border border-purple-200 text-purple-600 text-xs font-medium hover:bg-purple-50 transition-colors cursor-pointer disabled:opacity-50"
+                        className="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-medium hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-50"
                       >
                         Change
                       </button>
                       <button
                         onClick={handleUpload}
                         disabled={isUploading}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-lavender-600 text-white text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-all cursor-pointer"
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-red-600 to-rose-600 text-white text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-all cursor-pointer shadow-md shadow-red-950/50"
                       >
                         {isUploading ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
@@ -262,16 +258,16 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                 {uploadProgress && isUploading && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-zinc-400">
                         {STAGE_LABELS[uploadProgress.stage]}
                       </span>
-                      <span className="text-xs font-mono text-purple-600">
+                      <span className="text-xs font-mono text-red-400 font-semibold">
                         {uploadProgress.percentage}%
                       </span>
                     </div>
-                    <div className="h-2 bg-purple-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-purple-400 to-lavender-500 transition-all duration-500 ease-out rounded-full"
+                        className="h-full bg-gradient-to-r from-red-600 to-rose-500 transition-all duration-500 ease-out rounded-full"
                         style={{ width: `${uploadProgress.percentage}%` }}
                       />
                     </div>
@@ -282,8 +278,8 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
 
             {/* Error */}
             {error && (
-              <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-600 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <div className="mt-4 p-3 rounded-xl bg-red-950/50 border border-red-900/60 text-sm text-red-300 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
                 <span>{error}</span>
               </div>
             )}
@@ -293,3 +289,4 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
     </>
   );
 }
+

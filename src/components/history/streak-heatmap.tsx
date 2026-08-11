@@ -51,11 +51,11 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
   }, [sessionsByDate]);
 
   const levelColors = [
-    "bg-purple-100/50",
-    "bg-purple-200",
-    "bg-purple-300",
-    "bg-purple-500",
-    "bg-purple-700",
+    "bg-zinc-900 border border-zinc-800",
+    "bg-red-950/70 border border-red-900/60",
+    "bg-red-800",
+    "bg-red-600",
+    "bg-red-500 shadow-sm shadow-red-500/50",
   ];
 
   const dayLabels = ["", "Mon", "", "Wed", "", "Fri", ""];
@@ -68,7 +68,7 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
           {dayLabels.map((label, i) => (
             <div
               key={i}
-              className="h-3 flex items-center text-[9px] text-slate-400"
+              className="h-3 flex items-center text-[9px] font-mono text-zinc-500"
             >
               {label}
             </div>
@@ -82,7 +82,7 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
             {months.map((m, i) => (
               <div
                 key={i}
-                className="text-[9px] text-slate-400"
+                className="text-[9px] font-mono text-zinc-400"
                 style={{
                   position: "relative",
                   left: `${m.col * 16}px`,
@@ -99,7 +99,7 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
                 {week.map((day, di) => (
                   <div
                     key={`${wi}-${di}`}
-                    className={`w-3 h-3 rounded-sm ${levelColors[day.level]} transition-colors hover:ring-1 hover:ring-purple-400`}
+                    className={`w-3 h-3 rounded-sm ${levelColors[day.level]} transition-all hover:scale-125 hover:z-10`}
                     title={`${day.date}: ${day.minutes} min`}
                   />
                 ))}
@@ -110,7 +110,7 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-1 mt-3 justify-end text-[9px] text-slate-400">
+      <div className="flex items-center gap-1.5 mt-4 justify-end text-[10px] text-zinc-400 font-mono">
         <span>Less</span>
         {levelColors.map((color, i) => (
           <div key={i} className={`w-3 h-3 rounded-sm ${color}`} />
@@ -120,3 +120,4 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
     </div>
   );
 }
+

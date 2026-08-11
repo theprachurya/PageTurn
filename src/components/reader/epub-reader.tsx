@@ -117,12 +117,12 @@ export function EpubReader({
   const applySettings = useCallback((rendition: Rendition, s: ReaderSettings) => {
     const themes = {
       light: { 
-        body: { background: "#ffffff", color: "#1a1a2e", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+        body: { background: "#ffffff", color: "#18181b", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
         img: { "max-width": "100% !important", height: "auto !important" },
         svg: { "max-width": "100% !important", height: "auto !important" }
       },
       dark: { 
-        body: { background: "#1a1a2e", color: "#e2e8f0", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+        body: { background: "#0f0f12", color: "#f4f4f5", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
         img: { "max-width": "100% !important", height: "auto !important" },
         svg: { "max-width": "100% !important", height: "auto !important" }
       },
@@ -215,13 +215,14 @@ export function EpubReader({
       style.innerHTML = `
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.4); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.8); }
-        ::selection { background: rgba(168, 85, 247, 0.3); }
+        ::-webkit-scrollbar-thumb { background: rgba(239, 68, 68, 0.4); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(239, 68, 68, 0.8); }
+        ::selection { background: rgba(239, 68, 68, 0.3); }
         .epub-highlight { fill-opacity: 0.3 !important; mix-blend-mode: multiply; }
       `;
       contents.document.head.appendChild(style);
     });
+
 
     if (currentCfi) {
       rendition.display(currentCfi);
@@ -591,7 +592,7 @@ export function EpubReader({
     };
   }, []);
 
-  const bgColors = { light: "bg-white", dark: "bg-[#1a1a2e]", sepia: "bg-[#f4ecd8]" };
+  const bgColors = { light: "bg-white", dark: "bg-[#0f0f12]", sepia: "bg-[#f4ecd8]" };
   const isBookmarked = bookmarks.some(b => {
     if (!bookRef.current || bookRef.current.locations.length() === 0) return b.cfi === currentCfi;
     try {
@@ -608,7 +609,7 @@ export function EpubReader({
       
       {/* Real-time Sync Prompt */}
       {syncPrompt && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-purple-600 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-in slide-in-from-top-5">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-in slide-in-from-top-5">
           <span className="text-sm">Synced to a newer position on another device.</span>
           <div className="flex gap-2">
             <button onClick={() => { navigateTo(syncPrompt.cfi); setSyncPrompt(null); }} className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors cursor-pointer">Jump</button>
@@ -678,12 +679,13 @@ export function EpubReader({
         />
       </div>
 
-      <div className={`h-1 ${settings.theme === "dark" ? "bg-slate-700" : "bg-gray-200"}`}>
+      <div className={`h-1 ${settings.theme === "dark" ? "bg-zinc-900" : "bg-gray-200"}`}>
         <div
-          className="h-full bg-gradient-to-r from-purple-400 to-lavender-500 transition-all duration-300"
+          className="h-full bg-gradient-to-r from-red-600 to-rose-600 transition-all duration-300"
           style={{ width: `${progress}%` }}
         />
       </div>
     </div>
   );
 }
+

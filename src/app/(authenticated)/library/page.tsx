@@ -46,7 +46,6 @@ export default function LibraryPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // 1. Fetch user_books
     const { data: ubData } = await supabase
       .from("user_books")
       .select(`
@@ -56,7 +55,6 @@ export default function LibraryPage() {
       .eq("user_id", user.id)
       .order("last_read_at", { ascending: false });
 
-    // 2. Fetch tags mapping and all user tags
     const { data: tagsData } = await supabase
       .from("book_tags")
       .select(`
@@ -73,7 +71,6 @@ export default function LibraryPage() {
       
     if (userTagsData) setAllUserTags(userTagsData);
 
-    // 3. Fetch shelves mapping
     const { data: shelvesData } = await supabase
       .from("shelf_books")
       .select(`
@@ -86,13 +83,11 @@ export default function LibraryPage() {
       const mapped = ubData.map((ub: any) => {
         const book = ub.books;
         
-        // Match tags
         const bookTags = tagsData
           ?.filter(t => t.book_id === ub.book_id)
           .map(t => t.tags)
           .filter(Boolean) as unknown as BookTag[];
 
-        // Match shelves
         const bookShelves = shelvesData
           ?.filter(s => s.book_id === ub.book_id)
           .map(s => s.shelves)
@@ -131,7 +126,6 @@ export default function LibraryPage() {
   const handleUpdateStatus = async (bookId: string, newStatus: BookStatus) => {
     try {
       await updateReadingStatus(bookId, newStatus);
-      // Optimistic update
       setBooks(books.map(b => {
         if (b.book_id === bookId) {
           return {
@@ -144,7 +138,7 @@ export default function LibraryPage() {
       }));
     } catch (err) {
       console.error("Failed to update status", err);
-      fetchLibraryData(); // revert on failure
+      fetchLibraryData();
     }
   };
 
@@ -173,7 +167,6 @@ export default function LibraryPage() {
         return timeB - timeA;
       case "added":
       default:
-        // Assume ID or another proxy for added time. user_books created_at is ideal but we don't have it in state, so fallback to recent.
         return 0;
     }
   });
@@ -181,53 +174,53 @@ export default function LibraryPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-zinc-800 border-t-red-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 flex flex-col md:flex-row gap-8">
+    <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 flex flex-col md:flex-row gap-8 text-zinc-100">
       {/* Sidebar Filters */}
       <aside className="w-full md:w-64 flex-shrink-0">
         <div className="sticky top-8 space-y-8">
           <div>
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Library</h2>
+            <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Library</h2>
             <div className="space-y-1">
               <button 
                 onClick={() => setStatusFilter("all")}
-                className={cn("w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer", statusFilter === "all" ? "bg-purple-100 text-purple-700" : "text-slate-600 hover:bg-slate-100")}
+                className={cn("w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer border", statusFilter === "all" ? "bg-red-950/40 text-red-400 border-red-900/50" : "text-zinc-400 border-transparent hover:bg-zinc-900 hover:text-zinc-200")}
               >
                 <Library className="w-4 h-4" /> All Books
-                <span className="ml-auto text-xs opacity-60">{books.length}</span>
+                <span className="ml-auto text-xs opacity-60 font-mono">{books.length}</span>
               </button>
               <button 
                 onClick={() => setStatusFilter("reading")}
-                className={cn("w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer", statusFilter === "reading" ? "bg-purple-100 text-purple-700" : "text-slate-600 hover:bg-slate-100")}
+                className={cn("w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer border", statusFilter === "reading" ? "bg-red-950/40 text-red-400 border-red-900/50" : "text-zinc-400 border-transparent hover:bg-zinc-900 hover:text-zinc-200")}
               >
                 <Book className="w-4 h-4" /> Reading
-                <span className="ml-auto text-xs opacity-60">{books.filter(b => b.status === "reading").length}</span>
+                <span className="ml-auto text-xs opacity-60 font-mono">{books.filter(b => b.status === "reading").length}</span>
               </button>
               <button 
                 onClick={() => setStatusFilter("plan_to_read")}
-                className={cn("w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer", statusFilter === "plan_to_read" ? "bg-purple-100 text-purple-700" : "text-slate-600 hover:bg-slate-100")}
+                className={cn("w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer border", statusFilter === "plan_to_read" ? "bg-red-950/40 text-red-400 border-red-900/50" : "text-zinc-400 border-transparent hover:bg-zinc-900 hover:text-zinc-200")}
               >
                 <Clock className="w-4 h-4" /> Want to Read
-                <span className="ml-auto text-xs opacity-60">{books.filter(b => b.status === "plan_to_read").length}</span>
+                <span className="ml-auto text-xs opacity-60 font-mono">{books.filter(b => b.status === "plan_to_read").length}</span>
               </button>
               <button 
                 onClick={() => setStatusFilter("completed")}
-                className={cn("w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer", statusFilter === "completed" ? "bg-purple-100 text-purple-700" : "text-slate-600 hover:bg-slate-100")}
+                className={cn("w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer border", statusFilter === "completed" ? "bg-red-950/40 text-red-400 border-red-900/50" : "text-zinc-400 border-transparent hover:bg-zinc-900 hover:text-zinc-200")}
               >
                 <CheckCircle className="w-4 h-4" /> Finished
-                <span className="ml-auto text-xs opacity-60">{books.filter(b => b.status === "completed").length}</span>
+                <span className="ml-auto text-xs opacity-60 font-mono">{books.filter(b => b.status === "completed").length}</span>
               </button>
             </div>
           </div>
           
           <div>
             <div className="flex items-center justify-between mb-3 px-3">
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tags</h2>
+              <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tags</h2>
             </div>
             {allUserTags.length > 0 ? (
               <div className="flex flex-wrap gap-2 px-3">
@@ -238,8 +231,8 @@ export default function LibraryPage() {
                     className={cn(
                       "px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer",
                       activeTagId === tag.id
-                        ? "bg-purple-100 border-purple-200 text-purple-700" 
-                        : "bg-white border-slate-200 text-slate-600 hover:border-purple-300"
+                        ? "bg-red-950/60 border-red-800 text-red-300" 
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
                     )}
                   >
                     {tag.name}
@@ -247,7 +240,7 @@ export default function LibraryPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-500 italic px-3">No tags yet</p>
+              <p className="text-xs text-zinc-600 italic px-3">No tags yet</p>
             )}
           </div>
           
@@ -260,25 +253,25 @@ export default function LibraryPage() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800 mb-1">
+            <h1 className="text-3xl font-extrabold text-zinc-100 mb-1">
               {activeShelfId 
                 ? "Shelf View" 
                 : statusFilter === "all" ? "All Books" : statusFilter === "reading" ? "Currently Reading" : statusFilter === "plan_to_read" ? "Want to Read" : "Finished"}
             </h1>
-            <p className="text-slate-500">
+            <p className="text-zinc-400 text-sm font-mono">
               {filteredBooks.length} {filteredBooks.length === 1 ? "book" : "books"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             {/* Search */}
             <div className="relative flex-1 lg:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input 
                 type="text" 
                 placeholder="Search library..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 focus:outline-none focus:border-red-600 text-sm text-zinc-100 placeholder-zinc-500 shadow-inner"
               />
             </div>
             
@@ -287,22 +280,22 @@ export default function LibraryPage() {
               <select 
                 value={sortBy} 
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white cursor-pointer"
+                className="appearance-none pl-3.5 pr-8 py-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 text-sm text-zinc-300 focus:outline-none focus:border-red-600 cursor-pointer shadow-inner"
               >
                 <option value="recent">Recently Opened</option>
                 <option value="title">Title</option>
                 <option value="progress">Progress</option>
               </select>
-              <ArrowDownAZ className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <ArrowDownAZ className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
             </div>
 
             {/* View Toggle */}
-            <div className="hidden sm:flex items-center bg-purple-50 rounded-xl p-1 shrink-0">
+            <div className="hidden sm:flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 shrink-0">
               <button
                 onClick={() => setViewMode("grid")}
                 className={cn(
                   "p-2 rounded-lg transition-all cursor-pointer",
-                  viewMode === "grid" ? "bg-white shadow-sm text-purple-600" : "text-slate-400 hover:text-purple-500"
+                  viewMode === "grid" ? "bg-zinc-800 text-red-400 shadow-sm" : "text-zinc-500 hover:text-zinc-300"
                 )}
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -311,7 +304,7 @@ export default function LibraryPage() {
                 onClick={() => setViewMode("list")}
                 className={cn(
                   "p-2 rounded-lg transition-all cursor-pointer",
-                  viewMode === "list" ? "bg-white shadow-sm text-purple-600" : "text-slate-400 hover:text-purple-500"
+                  viewMode === "list" ? "bg-zinc-800 text-red-400 shadow-sm" : "text-zinc-500 hover:text-zinc-300"
                 )}
               >
                 <List className="w-4 h-4" />
@@ -325,12 +318,12 @@ export default function LibraryPage() {
 
         {/* Books Grid/List */}
         {filteredBooks.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-slate-100">
-            <div className="w-20 h-20 rounded-3xl bg-purple-50 flex items-center justify-center mx-auto mb-6">
-              <Filter className="w-8 h-8 text-purple-300" />
+          <div className="text-center py-20 bg-zinc-900/50 rounded-3xl border border-zinc-800">
+            <div className="w-20 h-20 rounded-3xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center mx-auto mb-6">
+              <Filter className="w-8 h-8 text-zinc-600" />
             </div>
-            <h2 className="text-xl font-semibold text-slate-700 mb-2">No books found</h2>
-            <p className="text-slate-400 mb-6">You don't have any books matching this filter.</p>
+            <h2 className="text-xl font-bold text-zinc-300 mb-2">No books found</h2>
+            <p className="text-zinc-500 text-sm mb-6">You don't have any books matching this filter.</p>
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
@@ -391,3 +384,4 @@ export default function LibraryPage() {
     </div>
   );
 }
+

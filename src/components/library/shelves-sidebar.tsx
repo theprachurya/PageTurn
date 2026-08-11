@@ -68,10 +68,10 @@ export function ShelvesSidebar({ activeShelfId, onSelectShelf }: ShelvesSidebarP
   return (
     <div className="mt-8">
       <div className="flex items-center justify-between mb-3 px-3">
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Shelves</h2>
+        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Shelves</h2>
         <button 
           onClick={() => setIsCreating(!isCreating)}
-          className="p-1 hover:bg-slate-100 rounded-md text-slate-400 hover:text-purple-600 transition-colors cursor-pointer"
+          className="p-1 hover:bg-zinc-800 rounded-md text-zinc-400 hover:text-red-400 transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -86,7 +86,7 @@ export function ShelvesSidebar({ activeShelfId, onSelectShelf }: ShelvesSidebarP
               placeholder="Shelf name..."
               value={newShelfName}
               onChange={(e) => setNewShelfName(e.target.value)}
-              className="w-full text-sm px-2 py-1.5 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+              className="w-full text-sm px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:border-red-600 font-medium"
               onBlur={() => {
                 if (!newShelfName) setIsCreating(false);
               }}
@@ -95,28 +95,28 @@ export function ShelvesSidebar({ activeShelfId, onSelectShelf }: ShelvesSidebarP
         )}
         
         {loading ? (
-          <div className="px-4 py-2 text-sm text-slate-400">Loading...</div>
+          <div className="px-4 py-2 text-xs text-zinc-500 font-mono">Loading shelves...</div>
         ) : shelves.length === 0 && !isCreating ? (
-          <div className="px-4 py-2 text-xs text-slate-400 italic">No custom shelves.</div>
+          <div className="px-4 py-2 text-xs text-zinc-600 italic">No custom shelves.</div>
         ) : (
           shelves.map(shelf => (
             <div key={shelf.id} className="group relative">
               <button
                 onClick={() => onSelectShelf(activeShelfId === shelf.id ? null : shelf.id)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer text-left",
+                  "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer text-left border",
                   activeShelfId === shelf.id 
-                    ? "bg-purple-100 text-purple-700" 
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "bg-red-950/40 text-red-400 border-red-900/50" 
+                    : "text-zinc-400 border-transparent hover:bg-zinc-900 hover:text-zinc-200"
                 )}
               >
-                <Folder className={cn("w-4 h-4", activeShelfId === shelf.id ? "fill-current text-purple-400" : "text-slate-400")} />
+                <Folder className={cn("w-4 h-4", activeShelfId === shelf.id ? "fill-current text-red-500" : "text-zinc-500")} />
                 <span className="truncate pr-6">{shelf.name}</span>
               </button>
               
               <button
                 onClick={() => handleDeleteShelf(shelf.id, shelf.name)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Delete shelf"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -128,3 +128,4 @@ export function ShelvesSidebar({ activeShelfId, onSelectShelf }: ShelvesSidebarP
     </div>
   );
 }
+

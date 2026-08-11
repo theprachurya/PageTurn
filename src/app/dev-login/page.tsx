@@ -35,10 +35,9 @@ export default function DevLoginPage() {
       }
 
       setStatus("Success! Redirecting to library...");
-      // Add a small delay so we can see the success message
       setTimeout(() => {
         router.push("/library");
-        router.refresh(); // Ensure the server components get the new session
+        router.refresh();
       }, 1000);
     }
     
@@ -46,12 +45,13 @@ export default function DevLoginPage() {
   }, [router, supabase]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-800">
-      <div className="bg-white p-8 rounded-2xl shadow-xl max-w-sm w-full text-center">
-        <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4" />
-        <h1 className="text-xl font-bold mb-2">Developer Login</h1>
-        <p className="text-slate-500 text-sm">{status}</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#09090b] text-zinc-100 p-4">
+      <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center">
+        <div className="w-12 h-12 border-4 border-zinc-800 border-t-red-600 rounded-full animate-spin mx-auto mb-4" />
+        <h1 className="text-xl font-bold mb-2 text-zinc-100">Developer Login</h1>
+        <p className="text-zinc-400 text-sm font-mono">{status}</p>
       </div>
     </div>
   );
 }
+

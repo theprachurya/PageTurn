@@ -38,42 +38,42 @@ export function AIRecapDialog({ bookId, bookTitle, currentCfi, onClose }: AIReca
   }, [bookId, bookTitle, currentCfi]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 border border-purple-100">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-purple-50 to-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 text-zinc-100">
+        <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-500" />
-            <h2 className="font-semibold text-slate-800">
+            <Sparkles className="w-5 h-5 text-red-500" />
+            <h2 className="font-bold text-zinc-100">
               AI Recap
             </h2>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer">
+          <button onClick={onClose} className="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
         
         <div className="p-6 min-h-[200px] flex flex-col items-center justify-center text-center">
           {loading ? (
-            <div className="flex flex-col items-center justify-center gap-4 text-purple-600">
-              <Loader2 className="w-8 h-8 animate-spin" />
-              <p className="text-sm font-medium animate-pulse">Generating your personalized recap...</p>
+            <div className="flex flex-col items-center justify-center gap-4 text-red-400">
+              <Loader2 className="w-8 h-8 animate-spin text-red-500" />
+              <p className="text-sm font-medium animate-pulse text-zinc-400">Generating your story recap...</p>
             </div>
           ) : error ? (
-            <div className="text-red-500 text-sm">{error}</div>
+            <div className="text-red-400 text-sm">{error}</div>
           ) : (
             <div className="text-left w-full">
-              <h3 className="text-lg font-bold text-slate-800 mb-2">{bookTitle}</h3>
-              <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
+              <h3 className="text-lg font-extrabold text-zinc-100 mb-2">{bookTitle}</h3>
+              <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">
                 {recap}
               </p>
             </div>
           )}
         </div>
         
-        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+        <div className="p-4 border-t border-zinc-800 bg-zinc-950/50 flex justify-end">
           <button 
             onClick={onClose}
-            className="px-5 py-2.5 bg-gradient-to-r from-purple-500 to-lavender-600 text-white rounded-xl text-sm font-medium shadow-md shadow-purple-200 hover:scale-105 transition-all cursor-pointer"
+            className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-red-950/60 transition-all cursor-pointer border border-red-500/30"
           >
             Ready to Read
           </button>
@@ -82,3 +82,4 @@ export function AIRecapDialog({ bookId, bookTitle, currentCfi, onClose }: AIReca
     </div>
   );
 }
+
