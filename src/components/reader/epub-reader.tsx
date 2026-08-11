@@ -111,9 +111,21 @@ export function EpubReader({
   // Apply settings to rendition
   const applySettings = useCallback((rendition: Rendition, s: ReaderSettings) => {
     const themes = {
-      light: { body: { background: "#ffffff", color: "#1a1a2e" } },
-      dark: { body: { background: "#1a1a2e", color: "#e2e8f0" } },
-      sepia: { body: { background: "#f4ecd8", color: "#5b4636" } },
+      light: { 
+        body: { background: "#ffffff", color: "#1a1a2e", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+        img: { "max-width": "100% !important", height: "auto !important" },
+        svg: { "max-width": "100% !important", height: "auto !important" }
+      },
+      dark: { 
+        body: { background: "#1a1a2e", color: "#e2e8f0", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+        img: { "max-width": "100% !important", height: "auto !important" },
+        svg: { "max-width": "100% !important", height: "auto !important" }
+      },
+      sepia: { 
+        body: { background: "#f4ecd8", color: "#5b4636", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+        img: { "max-width": "100% !important", height: "auto !important" },
+        svg: { "max-width": "100% !important", height: "auto !important" }
+      },
     };
 
     const fontFamilies = {
@@ -186,6 +198,18 @@ export function EpubReader({
 
     applySettings(rendition, settings);
 
+    rendition.hooks.content.register((contents: any) => {
+      const style = contents.document.createElement("style");
+      style.innerHTML = `
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.4); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.8); }
+        ::selection { background: rgba(168, 85, 247, 0.3); }
+      `;
+      contents.document.head.appendChild(style);
+    });
+
     if (currentCfi) {
       rendition.display(currentCfi);
     } else if (initialCfi) {
@@ -250,8 +274,18 @@ export function EpubReader({
       });
     }));
 
-    // Iframe clicks
-    rendition.on("click", () => {
+    // Iframe clicks (only toggle on pure left clicks, not selections or middle clicks)
+    rendition.on("click", (e: any) => {
+      // Ignore right or middle clicks (button 1 or 2)
+      if (e && e.button !== undefined && e.button !== 0) return;
+
+      // Ignore if text is selected in the iframe
+      const iframe = viewerRef.current?.querySelector("iframe");
+      if (iframe?.contentWindow) {
+        const selection = iframe.contentWindow.getSelection();
+        if (selection && selection.toString().length > 0) return;
+      }
+
       setShowToolbar(prev => !prev);
     });
 
@@ -295,6 +329,7 @@ export function EpubReader({
   const navigateTo = (href: string) => { renditionRef.current?.display(href); setSelection(null); };
 
   const handleCenterTap = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only allow left clicks
     if (selection || dictionaryWord) {
       setSelection(null);
       setDictionaryWord(null);
