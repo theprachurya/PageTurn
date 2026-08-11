@@ -4,7 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { BookOpen, ArrowRight, Clock, Sparkles } from "lucide-react";
-import { BookCard, type BookData } from "@/components/books/book-card";
+import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
+import { updateReadingStatus, type BookStatus } from "@/app/actions/library.actions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export default function ShelfPage() {
@@ -26,42 +27,61 @@ export default function ShelfPage() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data } = await supabase
+    // 1. Fetch user_books
+    const { data: ubData } = await supabase
       .from("user_books")
-      .select(
-        `
-        id,
-        book_id,
-        status,
-        current_cfi,
-        progress_percentage,
-        last_read_at,
-        books (
-          id,
-          title,
-          author,
-          description,
-          cover_url
-        )
-      `
-      )
+      .select(`
+        id, book_id, status, current_cfi, progress_percentage, last_read_at,
+        books (id, title, author, description, cover_url)
+      `)
       .eq("user_id", user.id)
       .order("last_read_at", { ascending: false });
 
-    if (data) {
-      const mapped = data.map((ub: Record<string, unknown>) => {
-        const book = ub.books as Record<string, unknown>;
+    // 2. Fetch tags mapping
+    const { data: tagsData } = await supabase
+      .from("book_tags")
+      .select(`
+        book_id,
+        tags (id, name, color)
+      `)
+      .eq("user_id", user.id);
+
+    // 3. Fetch shelves mapping
+    const { data: shelvesData } = await supabase
+      .from("shelf_books")
+      .select(`
+        book_id,
+        shelves (id, name)
+      `)
+      .eq("user_id", user.id);
+
+    if (ubData) {
+      const mapped = ubData.map((ub: any) => {
+        const book = ub.books;
+        
+        const bookTags = tagsData
+          ?.filter(t => t.book_id === ub.book_id)
+          .map(t => t.tags)
+          .filter(Boolean) as BookTag[];
+
+        const bookShelves = shelvesData
+          ?.filter(s => s.book_id === ub.book_id)
+          .map(s => s.shelves)
+          .filter(Boolean) as BookShelf[];
+
         return {
-          id: ub.id as string,
-          book_id: ub.book_id as string,
-          title: (book?.title as string) || "Unknown",
-          author: (book?.author as string) || null,
-          description: (book?.description as string) || null,
-          cover_url: (book?.cover_url as string) || null,
+          id: ub.id,
+          book_id: ub.book_id,
+          title: book?.title || "Unknown",
+          author: book?.author || null,
+          description: book?.description || null,
+          cover_url: book?.cover_url || null,
           progress_percentage: Number(ub.progress_percentage) || 0,
-          current_cfi: (ub.current_cfi as string) || null,
-          last_read_at: (ub.last_read_at as string) || null,
-          status: (ub.status as string) || "reading",
+          current_cfi: ub.current_cfi || null,
+          last_read_at: ub.last_read_at || null,
+          status: ub.status || "reading",
+          tags: bookTags,
+          shelves: bookShelves,
         };
       });
       setBooks(mapped);
@@ -69,7 +89,37 @@ export default function ShelfPage() {
     setLoading(false);
   };
 
+  const handleUpdateStatus = async (bookId: string, newStatus: BookStatus) => {
+    try {
+      await updateReadingStatus(bookId, newStatus);
+      // Optimistic update
+      setBooks(books.map(b => {
+        if (b.book_id === bookId) {
+          return {
+            ...b, 
+            status: newStatus,
+            progress_percentage: newStatus === "completed" ? 100 : newStatus === "plan_to_read" ? 0 : b.progress_percentage
+          };
+        }
+        return b;
+      }));
+    } catch (err) {
+      console.error("Failed to update status", err);
+      fetchBooks(); // revert on failure
+    }
+  };
+
+  const handleDelete = async (bookId: string) => {
+    if (!confirm("Are you sure you want to remove this book?")) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("user_books").delete().eq("book_id", bookId).eq("user_id", user.id);
+    await supabase.from("books").delete().eq("id", bookId).eq("user_id", user.id);
+    fetchBooks();
+  };
+
   const latestBook = books[0];
+  // Filter out the latest book from recent books, and maybe only show currently reading?
   const recentBooks = books.slice(1, 7);
 
   if (loading) {
@@ -99,7 +149,7 @@ export default function ShelfPage() {
             Continue Reading
           </div>
           <div className="flex gap-6 items-center">
-            <div className="w-24 h-36 md:w-32 md:h-48 rounded-xl overflow-hidden bg-white/10 flex-shrink-0 shadow-lg">
+            <div className="w-24 h-36 md:w-32 md:h-48 rounded-xl overflow-hidden bg-white/10 flex-shrink-0 shadow-lg relative">
               {latestBook.cover_url ? (
                 <img
                   src={latestBook.cover_url}
@@ -119,19 +169,23 @@ export default function ShelfPage() {
               <p className="text-purple-200 mb-4">
                 {latestBook.author || "Unknown Author"}
               </p>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 max-w-xs h-2 bg-white/20 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white/80 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${latestBook.progress_percentage}%`,
-                    }}
-                  />
+              
+              {latestBook.status !== "completed" && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 max-w-xs h-2 bg-white/20 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-white/80 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${latestBook.progress_percentage}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-purple-200">
+                    {Math.round(latestBook.progress_percentage)}%
+                  </span>
                 </div>
-                <span className="text-sm font-medium text-purple-200">
-                  {Math.round(latestBook.progress_percentage)}%
-                </span>
-              </div>
+              )}
+              
               <div className="mt-4 flex items-center gap-2 text-sm font-medium text-purple-200 group-hover:text-white transition-colors">
                 Continue
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -175,7 +229,14 @@ export default function ShelfPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {recentBooks.map((book) => (
-              <BookCard key={book.id} book={book} variant="grid" />
+              <BookCard 
+                key={book.id} 
+                book={book} 
+                variant="grid" 
+                onDelete={handleDelete}
+                onUpdateStatus={handleUpdateStatus}
+                onManageTags={(id) => alert(`Manage tags for ${id} (Coming soon)`)}
+              />
             ))}
           </div>
         </div>
