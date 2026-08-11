@@ -147,9 +147,15 @@ export function EpubReader({
     rendition.themes.override("font-family", fontFamilies[s.fontFamily]);
 
     if (s.disablePublisherCSS) {
-      rendition.themes.override("font-family", fontFamilies[s.fontFamily]);
       rendition.themes.override("line-height", "1.6");
       rendition.themes.override("text-align", "left");
+      rendition.themes.override("background", themes[s.theme as keyof typeof themes].body.background);
+      rendition.themes.override("color", themes[s.theme as keyof typeof themes].body.color);
+      rendition.themes.override("padding", "2rem 5%");
+    } else {
+      rendition.themes.override("background", "transparent");
+      rendition.themes.override("color", "inherit");
+      rendition.themes.override("padding", "inherit");
     }
   }, []);
 
@@ -212,6 +218,7 @@ export function EpubReader({
         ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.4); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.8); }
         ::selection { background: rgba(168, 85, 247, 0.3); }
+        .epub-highlight { fill-opacity: 0.3 !important; mix-blend-mode: multiply; }
       `;
       contents.document.head.appendChild(style);
     });
@@ -247,7 +254,7 @@ export function EpubReader({
       setTimeout(() => {
         highlights.forEach(hl => {
           try {
-            rendition.annotations.highlight(hl.cfi_range, {}, () => {}, "", { fill: hl.color, "fill-opacity": "0.3" });
+            rendition.annotations.highlight(hl.cfi_range, {}, () => {}, "epub-highlight", { fill: hl.color });
           } catch (e) { }
           // Calculate words on screen for WPM estimation
       try {
@@ -294,12 +301,23 @@ export function EpubReader({
       const rect = range.getBoundingClientRect();
       const text = contents.window.getSelection().toString();
       
-      setSelection({
-        cfiRange,
-        text,
-        x: rect.left + rect.width / 2,
-        y: rect.top,
-      });
+      const iframe = viewerRef.current?.querySelector("iframe");
+      if (iframe) {
+        const iframeRect = iframe.getBoundingClientRect();
+        setSelection({
+          cfiRange,
+          text,
+          x: iframeRect.left + rect.left + rect.width / 2,
+          y: iframeRect.top + rect.top,
+        });
+      } else {
+        setSelection({
+          cfiRange,
+          text,
+          x: rect.left + rect.width / 2,
+          y: rect.top,
+        });
+      }
       setActiveHighlightId(null);
     }));
 
@@ -309,11 +327,20 @@ export function EpubReader({
       if (highlight) {
         setActiveHighlightId(highlight.id);
         
-        // Try to get position of click event or use generic center
         try {
-          const rect = contents.window.getSelection()?.getRangeAt(0)?.getBoundingClientRect() 
-            || { left: window.innerWidth / 2, top: window.innerHeight / 2 };
-          setActiveHighlightPos({ x: rect.left, y: rect.top });
+          const range = contents.document.querySelector(`[data-epubcfi="${cfiRange}"]`);
+          const rect = range ? range.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2 };
+          
+          const iframe = viewerRef.current?.querySelector("iframe");
+          if (iframe && range) {
+            const iframeRect = iframe.getBoundingClientRect();
+            setActiveHighlightPos({ 
+              x: iframeRect.left + rect.left + rect.width / 2, 
+              y: iframeRect.top + rect.top 
+            });
+          } else {
+            setActiveHighlightPos({ x: rect.left, y: rect.top });
+          }
         } catch(e) {
           setActiveHighlightPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
         }
@@ -387,30 +414,36 @@ export function EpubReader({
   // ─── Actions (now via Server Actions / Offline Queue) ────────
 
   const handleToggleBookmark = async () => {
-    const existing = bookmarks.find(b => b.cfi === currentCfi);
+    // Snapshot bookmarks at the time of click to avoid stale closure
+    const snapshot = bookmarks;
+    const existing = snapshot.find(b => b.cfi === currentCfi);
     if (existing) {
+      // Optimistically remove immediately so UI reflects change
+      setBookmarks(prev => prev.filter(b => b.id !== existing.id));
       try {
         await removeBookmarkAction(existing.id);
-        setBookmarks(bookmarks.filter(b => b.id !== existing.id));
       } catch (err) {
         console.error("Failed to remove bookmark:", err);
+        // Rollback on failure
+        setBookmarks(prev => [existing, ...prev]);
       }
     } else {
       try {
         const data = await addBookmarkAction(bookId, currentCfi, chapter || "Bookmark");
-        if (data) setBookmarks([data, ...bookmarks]);
+        if (data) setBookmarks(prev => [data, ...prev]);
       } catch (err) {
         // If offline, queue it and add optimistically
         await enqueue({
           type: "addBookmark",
           args: { bookId, cfi: currentCfi, label: chapter || "Bookmark" },
         });
-        setBookmarks([{
+        const optimistic = {
           id: crypto.randomUUID(),
           cfi: currentCfi,
           label: chapter || "Bookmark",
           created_at: new Date().toISOString(),
-        }, ...bookmarks]);
+        };
+        setBookmarks(prev => [optimistic, ...prev]);
       }
     }
   };
@@ -434,8 +467,8 @@ export function EpubReader({
             selection.cfiRange,
             {},
             () => {},
-            "",
-            { fill: color, "fill-opacity": "0.3" }
+            "epub-highlight",
+            { fill: color }
           );
         } catch (e) {
           console.error("Failed to apply highlight in rendition", e);
@@ -559,7 +592,16 @@ export function EpubReader({
   }, []);
 
   const bgColors = { light: "bg-white", dark: "bg-[#1a1a2e]", sepia: "bg-[#f4ecd8]" };
-  const isBookmarked = bookmarks.some(b => b.cfi === currentCfi);
+  const isBookmarked = bookmarks.some(b => {
+    if (!bookRef.current || bookRef.current.locations.length() === 0) return b.cfi === currentCfi;
+    try {
+      const bPct = Math.round(bookRef.current.locations.percentageFromCfi(b.cfi) * 100);
+      const cPct = Math.round(progress);
+      return bPct === cPct;
+    } catch {
+      return b.cfi === currentCfi;
+    }
+  });
 
   return (
     <div className={`fixed inset-0 ${bgColors[settings.theme]} flex flex-col`}>

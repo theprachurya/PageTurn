@@ -110,8 +110,8 @@ export function ReaderToolbar({
             </button>
             <button
               onClick={() => {
-                setShowSidebar(true);
-                setActiveTab("toc");
+                setShowSidebar(!showSidebar);
+                if (!showSidebar) setActiveTab("toc");
               }}
               className="p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
             >
@@ -410,6 +410,24 @@ export function ReaderToolbar({
                 </button>
               ))}
             </div>
+          </div>
+          
+          {/* Custom CSS Toggle */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-white/60 uppercase tracking-wider">
+              Disable Publisher CSS
+            </span>
+            <button
+              onClick={() => onSettingsChange({ disablePublisherCSS: !settings.disablePublisherCSS })}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer",
+                settings.disablePublisherCSS
+                  ? "bg-purple-500 text-white"
+                  : "bg-white/10 hover:bg-white/20"
+              )}
+            >
+              {settings.disablePublisherCSS ? "On" : "Off"}
+            </button>
           </div>
           
         </div>

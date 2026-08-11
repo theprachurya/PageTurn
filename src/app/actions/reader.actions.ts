@@ -58,6 +58,13 @@ export async function logReadingSession(
   });
 
   if (error) throw new Error(`Failed to log session: ${error.message}`);
+
+  // Also update last_read_at to ensure history stays in sync with sessions
+  await supabase
+    .from("user_books")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("user_id", user.id)
+    .eq("book_id", bookId);
 }
 
 // ─── Bookmarks ─────────────────────────────────────────────────
