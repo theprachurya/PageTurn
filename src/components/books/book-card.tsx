@@ -304,21 +304,16 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onM
             )}
           </div>
         )}
-
-        {book.status !== "completed" && (
-          <div className="flex items-center gap-2 mt-auto pt-2 border-t border-zinc-800/60">
-            <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-red-600 to-rose-500 rounded-full transition-all duration-500"
-                style={{ width: `${book.progress_percentage}%` }}
-              />
-            </div>
-            <span className="text-[10px] font-semibold text-red-400">
-              {Math.round(book.progress_percentage)}%
-            </span>
-          </div>
-        )}
       </div>
+
+      {book.status !== "completed" && (
+        <div className="h-1 w-full bg-zinc-800 relative mt-auto mt-2">
+          <div
+            className="absolute top-0 left-0 h-full bg-red-600 transition-all duration-500 group-hover:shadow-[0_0_8px_rgba(220,38,38,0.8)]"
+            style={{ width: `${book.progress_percentage}%` }}
+          />
+        </div>
+      )}
     </Link>
   );
 }

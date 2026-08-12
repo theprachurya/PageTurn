@@ -249,29 +249,31 @@ export default function LibraryPage() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0 md:pl-4">
         {/* Header */}
+        <header className="mb-10">
+          <h2 className="text-4xl md:text-5xl font-extrabold text-zinc-100 tracking-tight mb-2">
+            {activeShelfId 
+              ? "Shelf View" 
+              : statusFilter === "all" ? "My Library" : statusFilter === "reading" ? "Currently Reading" : statusFilter === "plan_to_read" ? "Want to Read" : "Finished"}
+          </h2>
+          <p className="text-lg text-zinc-400">
+            {statusFilter === "all" ? "Your personal collection. Pick up where you left off." : `${filteredBooks.length} ${filteredBooks.length === 1 ? "book" : "books"} found`}
+          </p>
+        </header>
+
+        {/* Filters and Search */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-zinc-100 mb-1">
-              {activeShelfId 
-                ? "Shelf View" 
-                : statusFilter === "all" ? "All Books" : statusFilter === "reading" ? "Currently Reading" : statusFilter === "plan_to_read" ? "Want to Read" : "Finished"}
-            </h1>
-            <p className="text-zinc-400 text-sm font-mono">
-              {filteredBooks.length} {filteredBooks.length === 1 ? "book" : "books"}
-            </p>
-          </div>
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             {/* Search */}
-            <div className="relative flex-1 lg:w-64">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <div className="relative flex-1 lg:w-72 group focus-within:ring-1 focus-within:ring-red-500/50 rounded-xl transition-shadow">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-red-500" />
               <input 
                 type="text" 
                 placeholder="Search library..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 focus:outline-none focus:border-red-600 text-sm text-zinc-100 placeholder-zinc-500 shadow-inner"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 focus:outline-none focus:border-red-500 text-sm text-zinc-100 placeholder-zinc-500 transition-colors"
               />
             </div>
             
