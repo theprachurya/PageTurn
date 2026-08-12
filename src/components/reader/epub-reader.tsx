@@ -146,15 +146,17 @@ export function EpubReader({
     rendition.themes.fontSize(`${s.fontSize}%`);
     rendition.themes.override("font-family", fontFamilies[s.fontFamily]);
 
+    // Always override background and color so dark/sepia modes work regardless of publisher CSS
+    rendition.themes.override("background", themes[s.theme as keyof typeof themes].body.background);
+    rendition.themes.override("color", themes[s.theme as keyof typeof themes].body.color);
+
     if (s.disablePublisherCSS) {
       rendition.themes.override("line-height", "1.6");
       rendition.themes.override("text-align", "left");
-      rendition.themes.override("background", themes[s.theme as keyof typeof themes].body.background);
-      rendition.themes.override("color", themes[s.theme as keyof typeof themes].body.color);
       rendition.themes.override("padding", "2rem 5%");
     } else {
-      rendition.themes.override("background", "transparent");
-      rendition.themes.override("color", "inherit");
+      rendition.themes.override("line-height", "inherit");
+      rendition.themes.override("text-align", "inherit");
       rendition.themes.override("padding", "inherit");
     }
   }, []);

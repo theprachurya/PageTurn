@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Sidebar } from "./sidebar";
+import { TopNav } from "./top-nav";
 import { BottomNav } from "./bottom-nav";
 import { cn } from "@/lib/utils";
 
@@ -18,9 +18,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="absolute bottom-10 left-1/3 w-[600px] h-[600px] bg-rose-950/10 rounded-full blur-[160px]" />
         </div>
       )}
-      {!isReader && <Sidebar />}
+      {!isReader && <TopNav />}
       {!isReader && <BottomNav />}
-      <main className={cn("min-h-screen relative z-10", !isReader && "md:ml-64 pb-20 md:pb-0")}>
+      <main className={cn("min-h-screen relative z-10", !isReader && "pt-16 pb-20 md:pb-0")}>
         {children}
       </main>
     </div>
