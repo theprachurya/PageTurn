@@ -54,12 +54,15 @@ interface ReaderToolbarProps {
   onSettingsChange: (settings: Partial<ReaderSettings>) => void;
   chapter: string;
   progress: number;
+  chapterProgress?: number;
   toc: NavItem[];
   bookmarks?: BookmarkData[];
   highlights?: HighlightData[];
   estimatedTimeRemaining?: number | null;
   isBookmarked: boolean;
   onNavigate: (cfi: string) => void;
+  onNextChapter?: () => void;
+  onPrevChapter?: () => void;
   onToggleBookmark: () => void;
   onToggleTTS: () => void;
   isReadingAloud: boolean;
@@ -75,12 +78,15 @@ export function ReaderToolbar({
   onSettingsChange,
   chapter,
   progress,
+  chapterProgress = 0,
   toc,
   bookmarks = [],
   highlights = [],
   estimatedTimeRemaining,
   isBookmarked,
   onNavigate,
+  onNextChapter,
+  onPrevChapter,
   onToggleBookmark,
   onToggleTTS,
   isReadingAloud,
@@ -121,9 +127,28 @@ export function ReaderToolbar({
           
           <div className="text-center flex-1 mx-4">
             <p className="text-sm font-semibold truncate text-zinc-100">{chapter || "Reading"}</p>
-            <p className="text-xs text-zinc-400 font-mono">
-              {Math.round(progress)}% complete
-            </p>
+            <div className="flex items-center justify-center gap-2 mt-1">
+              {onPrevChapter && (
+                <button onClick={onPrevChapter} className="text-zinc-400 hover:text-white p-1 rounded transition-colors cursor-pointer" title="Previous Chapter">
+                  <ArrowLeft className="w-3 h-3" />
+                </button>
+              )}
+              <div className="flex flex-col items-center">
+                <p className="text-xs text-zinc-400 font-mono">
+                  {Math.round(progress)}% book
+                </p>
+                {chapterProgress > 0 && (
+                  <p className="text-[10px] text-zinc-500 font-mono">
+                    {Math.round(chapterProgress)}% chapter
+                  </p>
+                )}
+              </div>
+              {onNextChapter && (
+                <button onClick={onNextChapter} className="text-zinc-400 hover:text-white p-1 rounded transition-colors cursor-pointer" title="Next Chapter">
+                  <ArrowLeft className="w-3 h-3 rotate-180" />
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center gap-2">
@@ -426,6 +451,37 @@ export function ReaderToolbar({
             >
               {settings.disablePublisherCSS ? "On" : "Off"}
             </button>
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+              Layout Mode
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onSettingsChange({ viewMode: "scrolled" })}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border",
+                  settings.viewMode === "scrolled"
+                    ? "bg-red-600 border-red-500 text-white font-semibold shadow-md"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                )}
+              >
+                Scrolled
+              </button>
+              <button
+                onClick={() => onSettingsChange({ viewMode: "paginated" })}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border",
+                  settings.viewMode === "paginated"
+                    ? "bg-red-600 border-red-500 text-white font-semibold shadow-md"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                )}
+              >
+                Paginated
+              </button>
+            </div>
           </div>
           
         </div>

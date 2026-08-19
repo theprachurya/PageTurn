@@ -40,6 +40,7 @@ export function EpubReader({
   const [showToolbar, setShowToolbar] = useState(false);
   const [currentCfi, setCurrentCfi] = useState(initialCfi || "");
   const [progress, setProgress] = useState(initialProgress);
+  const [chapterProgress, setChapterProgress] = useState(0);
   const [chapter, setChapter] = useState("");
   const [toc, setToc] = useState<NavItem[]>([]);
   const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings());
@@ -153,11 +154,11 @@ export function EpubReader({
     if (s.disablePublisherCSS) {
       rendition.themes.override("line-height", "1.6");
       rendition.themes.override("text-align", "left");
-      rendition.themes.override("padding", "2rem 5%");
+      rendition.themes.override("padding", s.viewMode === "paginated" ? "0 !important" : "2rem 5%");
     } else {
       rendition.themes.override("line-height", "inherit");
       rendition.themes.override("text-align", "inherit");
-      rendition.themes.override("padding", "inherit");
+      rendition.themes.override("padding", s.viewMode === "paginated" ? "0 !important" : "inherit");
     }
   }, []);
 
@@ -203,9 +204,9 @@ export function EpubReader({
     const rendition = book.renderTo(viewerRef.current, {
       width: "100%",
       height: "100%",
-      flow: "scrolled-doc",
+      flow: settings.viewMode === "paginated" ? "paginated" : "scrolled-doc",
       spread: "none",
-      manager: "continuous",
+      manager: settings.viewMode === "paginated" ? "default" : "continuous",
     });
 
     renditionRef.current = rendition;
@@ -251,6 +252,14 @@ export function EpubReader({
         const pct = book.locations.percentageFromCfi(cfi) * 100;
         setProgress(pct);
         saveProgress(cfi, pct);
+      }
+
+      if (location.start && location.start.displayed) {
+        const currentP = location.start.displayed.page;
+        const totalP = location.start.displayed.total;
+        if (totalP > 0) {
+          setChapterProgress((currentP / totalP) * 100);
+        }
       }
 
       // Re-apply highlights after relocating
@@ -362,6 +371,19 @@ export function EpubReader({
         if (selection && selection.toString().length > 0) return;
       }
 
+      if (settings.viewMode === "paginated") {
+        const width = window.innerWidth;
+        const x = e.clientX;
+        if (x < width * 0.2) {
+          rendition.prev();
+          return;
+        }
+        if (x > width * 0.8) {
+          rendition.next();
+          return;
+        }
+      }
+
       setShowToolbar(prev => !prev);
     });
 
@@ -388,7 +410,7 @@ export function EpubReader({
       rendition.destroy();
       book.destroy();
     };
-  }, [epubUrl]);
+  }, [epubUrl, settings.viewMode]);
 
   const updateSettings = (newSettings: Partial<ReaderSettings>) => {
     const updated = { ...settings, ...newSettings };
@@ -411,7 +433,41 @@ export function EpubReader({
       setDictionaryWord(null);
       return;
     }
+
+    if (settings.viewMode === "paginated" && viewerRef.current) {
+      const rect = viewerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      if (x < rect.width * 0.2) {
+        goPrev();
+        return;
+      }
+      if (x > rect.width * 0.8) {
+        goNext();
+        return;
+      }
+    }
+
     setShowToolbar(!showToolbar);
+  };
+
+  const goNextChapter = () => {
+    if (renditionRef.current && bookRef.current && currentCfi) {
+      // @ts-ignore
+      const section = bookRef.current.spine.get(currentCfi);
+      if (section && section.next && section.next()) {
+        renditionRef.current.display(section.next());
+      }
+    }
+  };
+
+  const goPrevChapter = () => {
+    if (renditionRef.current && bookRef.current && currentCfi) {
+      // @ts-ignore
+      const section = bookRef.current.spine.get(currentCfi);
+      if (section && section.prev && section.prev()) {
+        renditionRef.current.display(section.prev());
+      }
+    }
   };
 
   // ─── Actions (now via Server Actions / Offline Queue) ────────
@@ -656,6 +712,7 @@ export function EpubReader({
         visible={showToolbar}
         chapter={chapter || "Unknown Chapter"}
         progress={progress}
+        chapterProgress={chapterProgress}
         toc={toc}
         bookmarks={bookmarks}
         highlights={highlights as any}
@@ -664,6 +721,8 @@ export function EpubReader({
         onSettingsChange={updateSettings}
         isBookmarked={isBookmarked}
         onNavigate={navigateTo}
+        onNextChapter={goNextChapter}
+        onPrevChapter={goPrevChapter}
         onToggleBookmark={handleToggleBookmark}
         onToggleTTS={handleToggleTTS}
         isReadingAloud={isReadingAloud}

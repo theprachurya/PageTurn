@@ -6,11 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import { BookOpen, ArrowRight, Clock, Sparkles } from "lucide-react";
 import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
 import { updateReadingStatus, type BookStatus } from "@/app/actions/library.actions";
+import { ManageCollectionsDialog } from "@/components/library/manage-collections-dialog";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export default function ShelfPage() {
   const [books, setBooks] = useState<BookData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [managingCollectionsForBook, setManagingCollectionsForBook] = useState<{ id: string, title: string, tags: BookTag[], shelves: BookShelf[] } | null>(null);
   const supabaseRef = useRef<SupabaseClient | null>(null);
   if (!supabaseRef.current && typeof window !== "undefined") {
     supabaseRef.current = createClient();
@@ -109,6 +111,14 @@ export default function ShelfPage() {
     if (!confirm("Are you sure you want to remove this book?")) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    
+    // Cascade deletes
+    await supabase.from("reading_sessions").delete().eq("book_id", bookId).eq("user_id", user.id);
+    await supabase.from("bookmarks").delete().eq("book_id", bookId).eq("user_id", user.id);
+    await supabase.from("highlights").delete().eq("book_id", bookId).eq("user_id", user.id);
+    await supabase.from("book_tags").delete().eq("book_id", bookId).eq("user_id", user.id);
+    await supabase.from("shelf_books").delete().eq("book_id", bookId).eq("user_id", user.id);
+
     await supabase.from("user_books").delete().eq("book_id", bookId).eq("user_id", user.id);
     await supabase.from("books").delete().eq("id", bookId).eq("user_id", user.id);
     fetchBooks();
@@ -232,7 +242,10 @@ export default function ShelfPage() {
                   variant="grid" 
                   onDelete={handleDelete}
                   onUpdateStatus={handleUpdateStatus}
-                  onManageTags={() => {}}
+                  onManageTags={(id) => {
+                    const b = books.find(x => x.book_id === id);
+                    if (b) setManagingCollectionsForBook({ id: b.book_id, title: b.title, tags: b.tags || [], shelves: b.shelves || [] });
+                  }}
                 />
               ))}
             </div>
@@ -343,13 +356,27 @@ export default function ShelfPage() {
                   variant="grid" 
                   onDelete={handleDelete}
                   onUpdateStatus={handleUpdateStatus}
-                  onManageTags={() => {}}
+                  onManageTags={(id) => {
+                    const b = books.find(x => x.book_id === id);
+                    if (b) setManagingCollectionsForBook({ id: b.book_id, title: b.title, tags: b.tags || [], shelves: b.shelves || [] });
+                  }}
                 />
               ))}
             </div>
           </section>
         )}
       </div>
+
+      {managingCollectionsForBook && (
+        <ManageCollectionsDialog
+          bookId={managingCollectionsForBook.id}
+          bookTitle={managingCollectionsForBook.title}
+          initialTags={managingCollectionsForBook.tags}
+          initialShelves={managingCollectionsForBook.shelves}
+          onClose={() => setManagingCollectionsForBook(null)}
+          onUpdate={fetchBooks}
+        />
+      )}
     </div>
   );
 }

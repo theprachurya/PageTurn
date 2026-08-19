@@ -118,6 +118,13 @@ export default function LibraryPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Cascade deletes
+    await supabase.from("reading_sessions").delete().eq("book_id", bookId).eq("user_id", user.id);
+    await supabase.from("bookmarks").delete().eq("book_id", bookId).eq("user_id", user.id);
+    await supabase.from("highlights").delete().eq("book_id", bookId).eq("user_id", user.id);
+    await supabase.from("book_tags").delete().eq("book_id", bookId).eq("user_id", user.id);
+    await supabase.from("shelf_books").delete().eq("book_id", bookId).eq("user_id", user.id);
+
     await supabase.from("user_books").delete().eq("book_id", bookId).eq("user_id", user.id);
     await supabase.from("books").delete().eq("id", bookId).eq("user_id", user.id);
     fetchLibraryData();
