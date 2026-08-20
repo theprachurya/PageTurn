@@ -453,37 +453,6 @@ export function ReaderToolbar({
             </button>
           </div>
 
-          {/* View Mode Toggle */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-              Layout Mode
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onSettingsChange({ viewMode: "scrolled" })}
-                className={cn(
-                  "px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border",
-                  settings.viewMode === "scrolled"
-                    ? "bg-red-600 border-red-500 text-white font-semibold shadow-md"
-                    : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-                )}
-              >
-                Scrolled
-              </button>
-              <button
-                onClick={() => onSettingsChange({ viewMode: "paginated" })}
-                className={cn(
-                  "px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border",
-                  settings.viewMode === "paginated"
-                    ? "bg-red-600 border-red-500 text-white font-semibold shadow-md"
-                    : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-                )}
-              >
-                Paginated
-              </button>
-            </div>
-          </div>
-          
         </div>
       </div>
     </div>

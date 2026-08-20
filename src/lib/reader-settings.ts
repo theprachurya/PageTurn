@@ -3,7 +3,6 @@ export interface ReaderSettings {
   fontSize: number;
   fontFamily: "serif" | "sans-serif" | "dyslexic";
   disablePublisherCSS: boolean;
-  viewMode: "scrolled" | "paginated";
 }
 
 const STORAGE_KEY = "pageturn-reader-settings";
@@ -13,7 +12,6 @@ const defaults: ReaderSettings = {
   fontSize: 100,
   fontFamily: "serif",
   disablePublisherCSS: false,
-  viewMode: "scrolled",
 };
 
 export function getReaderSettings(): ReaderSettings {

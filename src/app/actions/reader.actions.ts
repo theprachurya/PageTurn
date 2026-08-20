@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
 
 // ─── Progress ──────────────────────────────────────────────────
 
@@ -9,11 +9,7 @@ export async function syncProgress(
   cfi: string,
   progressPercentage: number
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   const { error } = await supabase
     .from("user_books")
@@ -38,11 +34,7 @@ export async function logReadingSession(
   chapterName: string | null,
   wordsRead: number = 0
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   const sessionDate = new Date(endTime).toISOString().split("T")[0];
 
@@ -74,11 +66,7 @@ export async function addBookmark(
   cfi: string,
   label: string
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   const { data, error } = await supabase
     .from("bookmarks")
@@ -96,11 +84,7 @@ export async function addBookmark(
 }
 
 export async function removeBookmark(bookmarkId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   const { error } = await supabase
     .from("bookmarks")
@@ -112,11 +96,7 @@ export async function removeBookmark(bookmarkId: string) {
 }
 
 export async function getBookmarks(bookId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   const { data, error } = await supabase
     .from("bookmarks")
@@ -137,11 +117,7 @@ export async function addHighlight(
   color: string,
   note: string | null
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   const { data, error } = await supabase
     .from("highlights")
@@ -160,11 +136,7 @@ export async function addHighlight(
 }
 
 export async function removeHighlight(highlightId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   const { error } = await supabase
     .from("highlights")
@@ -176,11 +148,7 @@ export async function removeHighlight(highlightId: string) {
 }
 
 export async function getHighlights(bookId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   const { data, error } = await supabase
     .from("highlights")

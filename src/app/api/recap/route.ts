@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
   try {
+    // Auth check — prevent anonymous access before wiring up a real LLM
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { bookId, bookTitle, currentCfi } = await req.json();
 
     // In a real implementation, this would call OpenAI/Gemini with the book's text up to the currentCfi.

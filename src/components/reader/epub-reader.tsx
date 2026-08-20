@@ -55,6 +55,11 @@ export function EpubReader({
   
   const { highlights, addHighlight, removeHighlight, updateHighlightNote } = useHighlights(bookId);
 
+  // Keep a ref in sync so epub.js listeners (which close over mount-time values)
+  // always see the latest highlights without requiring a full effect re-run.
+  const highlightsRef = useRef(highlights);
+  useEffect(() => { highlightsRef.current = highlights; }, [highlights]);
+
   const [selection, setSelection] = useState<{ cfiRange: string; text: string; x: number; y: number } | null>(null);
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
   const [activeHighlightPos, setActiveHighlightPos] = useState<{ x: number, y: number } | null>(null);
@@ -154,11 +159,11 @@ export function EpubReader({
     if (s.disablePublisherCSS) {
       rendition.themes.override("line-height", "1.6");
       rendition.themes.override("text-align", "left");
-      rendition.themes.override("padding", s.viewMode === "paginated" ? "0 !important" : "2rem 5%");
+      rendition.themes.override("padding", "2rem 5%");
     } else {
       rendition.themes.override("line-height", "inherit");
       rendition.themes.override("text-align", "inherit");
-      rendition.themes.override("padding", s.viewMode === "paginated" ? "0 !important" : "inherit");
+      rendition.themes.override("padding", "inherit");
     }
   }, []);
 
@@ -204,9 +209,9 @@ export function EpubReader({
     const rendition = book.renderTo(viewerRef.current, {
       width: "100%",
       height: "100%",
-      flow: settings.viewMode === "paginated" ? "paginated" : "scrolled-doc",
+      flow: "scrolled-doc",
       spread: "none",
-      manager: settings.viewMode === "paginated" ? "default" : "continuous",
+      manager: "continuous",
     });
 
     renditionRef.current = rendition;
@@ -262,19 +267,23 @@ export function EpubReader({
         }
       }
 
-      // Re-apply highlights after relocating
+      // Re-apply highlights after relocating (read from ref to avoid stale closure)
       setTimeout(() => {
-        highlights.forEach(hl => {
+        highlightsRef.current.forEach(hl => {
           try {
             rendition.annotations.highlight(hl.cfi_range, {}, () => {}, "epub-highlight", { fill: hl.color });
-          } catch (e) { }
-          // Calculate words on screen for WPM estimation
+          } catch (e) { /* ignore — CFI may not be in current view */ }
+        });
+      }, 100);
+
+      // Calculate words on screen for WPM estimation
       try {
-        const range = (rendition as any).getRange(location.start.cfi);
-        // getRange only gets a single node usually, but we can roughly estimate words per page
-        // A standard screen page has ~250 words
-        sessionWordsReadRef.current += 250;
-        
+        // Estimate visible words from the iframe's text content
+        const iframe = viewerRef.current?.querySelector("iframe");
+        const visibleText = iframe?.contentDocument?.body?.innerText || "";
+        const wordCount = visibleText.split(/\s+/).filter(Boolean).length;
+        sessionWordsReadRef.current += wordCount || 250; // fallback to 250
+
         // Update rolling WPM estimation if they've been reading for at least a minute
         const elapsedMinutes = (new Date().getTime() - sessionStartRef.current.getTime()) / 60000;
         if (elapsedMinutes > 1) {
@@ -282,16 +291,14 @@ export function EpubReader({
         }
 
         // Estimate remaining time in book based on progress
-        const remainingProgress = 1 - (progress / 100);
-        // If we assume a typical book has 80,000 words:
+        const currentPct = book.locations.length() > 0 ? book.locations.percentageFromCfi(cfi) : (progress / 100);
+        const remainingProgress = 1 - currentPct;
         const assumedTotalWords = 80000;
         const remainingWords = assumedTotalWords * remainingProgress;
         setEstimatedTimeRemaining(Math.round(remainingWords / wpmRef.current));
       } catch (e) {
         console.warn("Failed to calculate words", e);
       }
-    });
-      }, 100);
     }));
 
     rendition.on("rendered", ((...args: unknown[]) => {
@@ -333,9 +340,9 @@ export function EpubReader({
       setActiveHighlightId(null);
     }));
 
-    // Existing Highlight Click
+    // Existing Highlight Click (read from ref to avoid stale closure)
     rendition.on("markClicked", (cfiRange: any, data: any, contents: any) => {
-      const highlight = highlights.find(h => h.cfi_range === cfiRange);
+      const highlight = highlightsRef.current.find(h => h.cfi_range === cfiRange);
       if (highlight) {
         setActiveHighlightId(highlight.id);
         
@@ -371,19 +378,6 @@ export function EpubReader({
         if (selection && selection.toString().length > 0) return;
       }
 
-      if (settings.viewMode === "paginated") {
-        const width = window.innerWidth;
-        const x = e.clientX;
-        if (x < width * 0.2) {
-          rendition.prev();
-          return;
-        }
-        if (x > width * 0.8) {
-          rendition.next();
-          return;
-        }
-      }
-
       setShowToolbar(prev => !prev);
     });
 
@@ -410,7 +404,7 @@ export function EpubReader({
       rendition.destroy();
       book.destroy();
     };
-  }, [epubUrl, settings.viewMode]);
+  }, [epubUrl]);
 
   const updateSettings = (newSettings: Partial<ReaderSettings>) => {
     const updated = { ...settings, ...newSettings };
@@ -433,20 +427,6 @@ export function EpubReader({
       setDictionaryWord(null);
       return;
     }
-
-    if (settings.viewMode === "paginated" && viewerRef.current) {
-      const rect = viewerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      if (x < rect.width * 0.2) {
-        goPrev();
-        return;
-      }
-      if (x > rect.width * 0.8) {
-        goNext();
-        return;
-      }
-    }
-
     setShowToolbar(!showToolbar);
   };
 

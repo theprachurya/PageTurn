@@ -172,6 +172,9 @@ export async function uploadBookToSupabase(
   onProgress?.({ stage: "saving_metadata", percentage: 80 });
 
   // Stage: Insert metadata (20% of total progress)
+  // TODO: If this insert fails, the EPUB and cover files uploaded above become
+  // orphaned in Supabase Storage. Consider a cleanup cron or wrapping the
+  // entire upload in a transaction-like pattern that deletes uploaded files on failure.
   const { data: bookRecord, error: dbError } = await supabase
     .from("books")
     .insert({

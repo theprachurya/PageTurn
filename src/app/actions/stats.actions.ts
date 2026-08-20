@@ -1,6 +1,7 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
+import { differenceInCalendarDays } from "date-fns";
 
 export interface DailyStats {
   date: string;
@@ -18,9 +19,7 @@ export interface StatsData {
 }
 
 export async function getStats(): Promise<StatsData> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   // 1. Fetch all reading sessions
   const { data: sessions } = await supabase
@@ -65,28 +64,29 @@ export async function getStats(): Promise<StatsData> {
     }
   }
 
-  // Calculate streaks
+  // Calculate streaks using date-fns to avoid DST edge cases
   const dates = Array.from(dateMap.keys()).sort(); // YYYY-MM-DD string sorting
   
-  let currentStreak = 0;
   let longestStreak = 0;
   let tempStreak = 0;
   let lastDate: Date | null = null;
 
   for (const dateStr of dates) {
-    const date = new Date(dateStr);
+    // Parse as local date (YYYY-MM-DD → midnight local)
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
     
     if (!lastDate) {
       tempStreak = 1;
     } else {
-      const diffTime = Math.abs(date.getTime() - lastDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      const diffDays = differenceInCalendarDays(date, lastDate);
       
       if (diffDays === 1) {
         tempStreak++;
       } else if (diffDays > 1) {
         tempStreak = 1;
       }
+      // diffDays === 0 means same day (duplicate entry), keep streak as-is
     }
     
     if (tempStreak > longestStreak) {
@@ -97,15 +97,13 @@ export async function getStats(): Promise<StatsData> {
   }
   
   // Check if current streak is still active (read today or yesterday)
+  let currentStreak = 0;
   if (lastDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const diffTime = Math.abs(today.getTime() - lastDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    const diffDays = differenceInCalendarDays(today, lastDate);
     if (diffDays <= 1) {
       currentStreak = tempStreak;
-    } else {
-      currentStreak = 0;
     }
   }
 
@@ -127,9 +125,7 @@ export async function getStats(): Promise<StatsData> {
 }
 
 export async function exportAllUserData(): Promise<any> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const { supabase, user } = await requireUser();
 
   const [
     { data: profile },
