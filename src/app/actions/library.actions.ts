@@ -4,6 +4,37 @@ import { requireUser } from "@/lib/supabase/require-user";
 
 export type BookStatus = "plan_to_read" | "reading" | "completed";
 
+export interface BookMetadata {
+  title: string;
+  author: string;
+  description: string;
+  cover_url: string;
+}
+
+// ==========================================
+// Book Metadata Actions
+// ==========================================
+
+export async function updateBookMetadata(bookId: string, metadata: BookMetadata) {
+  const { supabase, user } = await requireUser();
+
+  const title = metadata.title.trim();
+  if (!title) throw new Error("Book title is required");
+
+  const { error } = await supabase
+    .from("books")
+    .update({
+      title,
+      author: metadata.author.trim() || null,
+      description: metadata.description.trim() || null,
+      cover_url: metadata.cover_url.trim() || null,
+    })
+    .eq("id", bookId)
+    .eq("user_id", user.id);
+
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
 
 // ==========================================
 // Reading Status Actions
