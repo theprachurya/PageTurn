@@ -56,23 +56,65 @@ export default function HistoryPage() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("daily_goal_minutes")
-      .eq("id", user.id)
-      .single();
+    const [
+      profileResult,
+      sessionsResult,
+      recentResult,
+      completedCountResult,
+      readingCountResult
+    ] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("daily_goal_minutes")
+        .eq("id", user.id)
+        .single(),
 
-    if (profile) setDailyGoal(profile.daily_goal_minutes);
+      supabase
+        .from("reading_sessions")
+        .select("session_date, duration_minutes")
+        .eq("user_id", user.id)
+        .order("session_date", { ascending: false }),
 
-    const { data: sessions } = await supabase
-      .from("reading_sessions")
-      .select("session_date, duration_minutes")
-      .eq("user_id", user.id)
-      .order("session_date", { ascending: false });
+      supabase
+        .from("reading_sessions")
+        .select(
+          `
+          id,
+          book_id,
+          session_date,
+          start_time,
+          end_time,
+          duration_minutes,
+          chapter_name,
+          books (
+            title,
+            author,
+            cover_url
+          )
+        `
+        )
+        .eq("user_id", user.id)
+        .order("start_time", { ascending: false })
+        .limit(20),
 
-    if (sessions) {
+      supabase
+        .from("user_books")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "completed"),
+
+      supabase
+        .from("user_books")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "reading")
+    ]);
+
+    if (profileResult.data) setDailyGoal(profileResult.data.daily_goal_minutes);
+
+    if (sessionsResult.data) {
       const byDate: Record<string, number> = {};
-      sessions.forEach(
+      sessionsResult.data.forEach(
         (s: { session_date: string; duration_minutes: number }) => {
           byDate[s.session_date] =
             (byDate[s.session_date] || 0) + s.duration_minutes;
@@ -97,44 +139,10 @@ export default function HistoryPage() {
       setStreak(currentStreak);
     }
 
-    const { data: recent } = await supabase
-      .from("reading_sessions")
-      .select(
-        `
-        id,
-        book_id,
-        session_date,
-        start_time,
-        end_time,
-        duration_minutes,
-        chapter_name,
-        books (
-          title,
-          author,
-          cover_url
-        )
-      `
-      )
-      .eq("user_id", user.id)
-      .order("start_time", { ascending: false })
-      .limit(20);
+    if (recentResult.data) setRecentSessions(recentResult.data as unknown as Session[]);
 
-    if (recent) setRecentSessions(recent as unknown as Session[]);
-
-    const { count: completedCount } = await supabase
-      .from("user_books")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("status", "completed");
-
-    const { count: readingCount } = await supabase
-      .from("user_books")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("status", "reading");
-
-    setTotalBooksRead(completedCount || 0);
-    setCurrentlyReading(readingCount || 0);
+    setTotalBooksRead(completedCountResult.count || 0);
+    setCurrentlyReading(readingCountResult.count || 0);
     setLoading(false);
   };
 

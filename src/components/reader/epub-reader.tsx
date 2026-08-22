@@ -36,6 +36,7 @@ export function EpubReader({
   const bookRef = useRef<Book | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
   const sessionStartRef = useRef<Date>(new Date());
+  const totalWordsRef = useRef<number>(0);
   
   const [showToolbar, setShowToolbar] = useState(false);
   const [currentCfi, setCurrentCfi] = useState(initialCfi || "");
@@ -59,6 +60,11 @@ export function EpubReader({
   // always see the latest highlights without requiring a full effect re-run.
   const highlightsRef = useRef(highlights);
   useEffect(() => { highlightsRef.current = highlights; }, [highlights]);
+
+  // Keep a ref for currentCfi so the Realtime callback can read it without
+  // re-subscribing on every page turn.
+  const currentCfiRef = useRef(currentCfi);
+  useEffect(() => { currentCfiRef.current = currentCfi; }, [currentCfi]);
 
   const [selection, setSelection] = useState<{ cfiRange: string; text: string; x: number; y: number } | null>(null);
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
@@ -98,6 +104,8 @@ export function EpubReader({
   }, [bookId]);
 
   // Real-time Sync Subscription (must stay client-side)
+  // Keys only on bookId — reads currentCfi from currentCfiRef to avoid
+  // tearing down the channel on every page turn.
   useEffect(() => {
     const channel = supabase
       .channel(`sync_${bookId}`)
@@ -106,7 +114,7 @@ export function EpubReader({
         { event: "UPDATE", schema: "public", table: "user_books", filter: `book_id=eq.${bookId}` },
         (payload) => {
           const newData = payload.new as any;
-          if (newData.current_cfi && newData.current_cfi !== currentCfi) {
+          if (newData.current_cfi && newData.current_cfi !== currentCfiRef.current) {
             const timeDiff = new Date().getTime() - new Date(newData.last_read_at).getTime();
             if (timeDiff < 10000) {
               setSyncPrompt({ cfi: newData.current_cfi, date: newData.last_read_at });
@@ -117,7 +125,7 @@ export function EpubReader({
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [bookId, currentCfi, supabase]);
+  }, [bookId, supabase]);
 
   // Apply settings to rendition
   const applySettings = useCallback((rendition: Rendition, s: ReaderSettings) => {
@@ -293,8 +301,9 @@ export function EpubReader({
         // Estimate remaining time in book based on progress
         const currentPct = book.locations.length() > 0 ? book.locations.percentageFromCfi(cfi) : (progress / 100);
         const remainingProgress = 1 - currentPct;
-        const assumedTotalWords = 80000;
-        const remainingWords = assumedTotalWords * remainingProgress;
+        // Use actual word count from locations if available, otherwise fall back to a rough estimate
+        const estimatedTotalWords = totalWordsRef.current > 0 ? totalWordsRef.current : 80000;
+        const remainingWords = estimatedTotalWords * remainingProgress;
         setEstimatedTimeRemaining(Math.round(remainingWords / wpmRef.current));
       } catch (e) {
         console.warn("Failed to calculate words", e);
@@ -383,6 +392,11 @@ export function EpubReader({
 
     book.ready.then(() => {
       return book.locations.generate(1600);
+    }).then(() => {
+      // Estimate total words from the generated locations.
+      // Each location span is ~1600 characters ≈ ~267 words (avg 6 chars/word).
+      const totalLocations = book.locations.length();
+      totalWordsRef.current = Math.round(totalLocations * (1600 / 6));
     });
 
     const keyupHandler = (e: KeyboardEvent) => {

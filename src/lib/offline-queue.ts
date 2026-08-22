@@ -145,8 +145,8 @@ export function initOfflineSync(): void {
   listenerAttached = true;
 
   window.addEventListener("online", async () => {
-    console.log("[PageTurn] Back online — flushing offline queue...");
+    console.debug("[PageTurn] Back online — flushing offline queue...");
     const result = await flushQueue();
-    console.log(`[PageTurn] Flushed: ${result.succeeded} succeeded, ${result.failed} failed`);
+    console.debug(`[PageTurn] Flushed: ${result.succeeded} succeeded, ${result.failed} failed`);
   });
 }

@@ -29,30 +29,34 @@ export default function ShelfPage() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: ubData } = await supabase
-      .from("user_books")
-      .select(`
-        id, book_id, status, current_cfi, progress_percentage, last_read_at,
-        books (id, title, author, description, cover_url)
-      `)
-      .eq("user_id", user.id)
-      .order("last_read_at", { ascending: false });
+    const [ubResult, tagsResult, shelvesResult] = await Promise.all([
+      supabase
+        .from("user_books")
+        .select(`
+          id, book_id, status, current_cfi, progress_percentage, last_read_at,
+          books (id, title, author, description, cover_url)
+        `)
+        .eq("user_id", user.id)
+        .order("last_read_at", { ascending: false }),
+      supabase
+        .from("book_tags")
+        .select(`
+          book_id,
+          tags (id, name, color)
+        `)
+        .eq("user_id", user.id),
+      supabase
+        .from("shelf_books")
+        .select(`
+          book_id,
+          shelves (id, name)
+        `)
+        .eq("user_id", user.id)
+    ]);
 
-    const { data: tagsData } = await supabase
-      .from("book_tags")
-      .select(`
-        book_id,
-        tags (id, name, color)
-      `)
-      .eq("user_id", user.id);
-
-    const { data: shelvesData } = await supabase
-      .from("shelf_books")
-      .select(`
-        book_id,
-        shelves (id, name)
-      `)
-      .eq("user_id", user.id);
+    const ubData = ubResult.data;
+    const tagsData = tagsResult.data;
+    const shelvesData = shelvesResult.data;
 
     if (ubData) {
       const mapped = ubData.map((ub: any) => {
