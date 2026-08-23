@@ -144,9 +144,17 @@ export function initOfflineSync(): void {
   if (typeof window === "undefined" || listenerAttached) return;
   listenerAttached = true;
 
-  window.addEventListener("online", async () => {
-    console.debug("[PageTurn] Back online — flushing offline queue...");
+  const flushIfOnline = async () => {
+    if (!navigator.onLine) return;
+
+    console.debug("[PageTurn] Online — flushing offline queue...");
     const result = await flushQueue();
     console.debug(`[PageTurn] Flushed: ${result.succeeded} succeeded, ${result.failed} failed`);
-  });
+  };
+
+  window.addEventListener("online", flushIfOnline);
+
+  // Flush any actions that were queued before this page loaded. The previous
+  // implementation only flushed after a future offline -> online transition.
+  void flushIfOnline();
 }
