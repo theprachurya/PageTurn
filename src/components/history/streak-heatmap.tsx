@@ -51,11 +51,11 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
   }, [sessionsByDate]);
 
   const levelColors = [
-    "bg-zinc-900 border border-zinc-800",
-    "bg-red-950/70 border border-red-900/60",
-    "bg-red-800",
-    "bg-red-600",
-    "bg-red-500 shadow-sm shadow-red-500/50",
+    "bg-zinc-900/80 border border-zinc-800/60",
+    "bg-gold-900/50 border border-gold-900/40",
+    "bg-gold-700/60",
+    "bg-gold-500/80",
+    "bg-gold-400 shadow-sm shadow-gold-500/30",
   ];
 
   const dayLabels = ["", "Mon", "", "Wed", "", "Fri", ""];
@@ -68,7 +68,7 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
           {dayLabels.map((label, i) => (
             <div
               key={i}
-              className="h-3 flex items-center text-[9px] font-mono text-zinc-500"
+              className="h-3 flex items-center text-[9px] font-mono text-zinc-600"
             >
               {label}
             </div>
@@ -82,7 +82,7 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
             {months.map((m, i) => (
               <div
                 key={i}
-                className="text-[9px] font-mono text-zinc-400"
+                className="text-[9px] font-mono text-zinc-500"
                 style={{
                   position: "relative",
                   left: `${m.col * 16}px`,
@@ -110,7 +110,7 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-1.5 mt-4 justify-end text-[10px] text-zinc-400 font-mono">
+      <div className="flex items-center gap-1.5 mt-4 justify-end text-[10px] text-zinc-500 font-mono">
         <span>Less</span>
         {levelColors.map((color, i) => (
           <div key={i} className={`w-3 h-3 rounded-sm ${color}`} />
@@ -120,4 +120,3 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
     </div>
   );
 }
-

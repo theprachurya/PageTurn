@@ -105,12 +105,12 @@ export function ReaderToolbar({
   return (
     <div className="fixed inset-0 z-50 pointer-events-none text-zinc-100 font-sans">
       {/* Top bar */}
-      <div className="pointer-events-auto absolute top-0 left-0 right-0 bg-zinc-950/90 backdrop-blur-xl text-zinc-100 p-4 border-b border-zinc-800/80 animate-fade-in shadow-2xl">
+      <div className="pointer-events-auto absolute top-0 left-0 right-0 bg-[#08080a]/92 backdrop-blur-2xl text-zinc-100 p-4 border-b border-zinc-800/40 animate-fade-in shadow-2xl">
         <div className="flex items-center justify-between max-w-3xl mx-auto">
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push("/shelf")}
-              className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-lg hover:bg-zinc-800/60 text-zinc-400 hover:text-white transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -119,55 +119,55 @@ export function ReaderToolbar({
                 setShowSidebar(!showSidebar);
                 if (!showSidebar) setActiveTab("toc");
               }}
-              className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-lg hover:bg-zinc-800/60 text-zinc-400 hover:text-white transition-colors cursor-pointer"
             >
               <Menu className="w-5 h-5" />
             </button>
           </div>
           
           <div className="text-center flex-1 mx-4">
-            <p className="text-sm font-semibold truncate text-zinc-100">{chapter || "Reading"}</p>
+            <p className="text-sm font-medium truncate text-zinc-200">{chapter || "Reading"}</p>
             <div className="flex items-center justify-center gap-2 mt-1">
               {onPrevChapter && (
-                <button onClick={onPrevChapter} className="text-zinc-400 hover:text-white p-1 rounded transition-colors cursor-pointer" title="Previous Chapter">
+                <button onClick={onPrevChapter} className="text-zinc-500 hover:text-white p-1 rounded transition-colors cursor-pointer" title="Previous Chapter">
                   <ArrowLeft className="w-3 h-3" />
                 </button>
               )}
               <div className="flex flex-col items-center">
-                <p className="text-xs text-zinc-400 font-mono">
+                <p className="text-xs text-zinc-500 font-mono">
                   {Math.round(progress)}% book
                 </p>
                 {chapterProgress > 0 && (
-                  <p className="text-[10px] text-zinc-500 font-mono">
+                  <p className="text-[10px] text-zinc-600 font-mono">
                     {Math.round(chapterProgress)}% chapter
                   </p>
                 )}
               </div>
               {onNextChapter && (
-                <button onClick={onNextChapter} className="text-zinc-400 hover:text-white p-1 rounded transition-colors cursor-pointer" title="Next Chapter">
+                <button onClick={onNextChapter} className="text-zinc-500 hover:text-white p-1 rounded transition-colors cursor-pointer" title="Next Chapter">
                   <ArrowLeft className="w-3 h-3 rotate-180" />
                 </button>
               )}
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={onToggleBookmark}
-              className="p-2 rounded-xl hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="p-2 rounded-lg hover:bg-zinc-800/60 transition-colors cursor-pointer"
             >
-              <Bookmark className={cn("w-5 h-5", isBookmarked ? "fill-current text-red-500" : "text-zinc-400")} />
+              <Bookmark className={cn("w-5 h-5", isBookmarked ? "fill-current text-gold-500" : "text-zinc-500")} />
             </button>
             <button
               onClick={onToggleTTS}
-              className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-lg hover:bg-zinc-800/60 text-zinc-400 hover:text-white transition-colors cursor-pointer"
               title={isReadingAloud ? "Stop Reading Aloud" : "Read Aloud"}
             >
-              {isReadingAloud ? <Square className="w-5 h-5 text-red-500" /> : <Volume2 className="w-5 h-5 text-zinc-400" />}
+              {isReadingAloud ? <Square className="w-5 h-5 text-gold-500" /> : <Volume2 className="w-5 h-5 text-zinc-500" />}
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-lg hover:bg-zinc-800/60 text-zinc-500 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -177,16 +177,16 @@ export function ReaderToolbar({
 
       {/* Sidebar */}
       {showSidebar && (
-        <div className="pointer-events-auto absolute inset-y-0 left-0 w-80 bg-zinc-950/95 backdrop-blur-2xl border-r border-zinc-800/80 text-zinc-100 shadow-2xl animate-in slide-in-from-left z-50 flex flex-col">
-          <div className="p-4 border-b border-zinc-800/80 flex flex-col gap-4">
+        <div className="pointer-events-auto absolute inset-y-0 left-0 w-80 bg-[#0c0c0e]/97 backdrop-blur-2xl border-r border-zinc-800/40 text-zinc-100 shadow-2xl animate-in slide-in-from-left z-50 flex flex-col">
+          <div className="p-4 border-b border-zinc-800/40 flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-lg text-zinc-100">Navigation</h2>
-              <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded-xl cursor-pointer">
+              <h2 className="font-semibold text-base text-zinc-100">Navigation</h2>
+              <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-zinc-800/60 text-zinc-500 hover:text-zinc-200 rounded-lg cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
             {/* Tabs */}
-            <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl">
+            <div className="flex bg-[#111113] border border-[#1f1f23] p-0.5 rounded-lg">
               {[
                 { id: "toc" as const, icon: List, title: "TOC" },
                 { id: "bookmarks" as const, icon: Bookmark, title: "Bookmarks" },
@@ -197,8 +197,8 @@ export function ReaderToolbar({
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
                   className={cn(
-                    "flex-1 p-2 flex justify-center items-center rounded-lg transition-colors cursor-pointer",
-                    activeTab === t.id ? "bg-red-600 text-white shadow-md shadow-red-950/50" : "text-zinc-400 hover:text-zinc-200"
+                    "flex-1 p-2 flex justify-center items-center rounded-md transition-colors cursor-pointer",
+                    activeTab === t.id ? "bg-gold-500 text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-200"
                   )}
                   title={t.title}
                 >
@@ -208,7 +208,7 @@ export function ReaderToolbar({
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
             {activeTab === "toc" && (
               toc.length > 0 ? (
                 toc.map((item, idx) => (
@@ -219,13 +219,13 @@ export function ReaderToolbar({
                       setShowSidebar(false);
                       onClose();
                     }}
-                    className="w-full text-left p-3 rounded-xl hover:bg-zinc-900 transition-colors text-sm font-medium text-zinc-300 hover:text-zinc-100 cursor-pointer border border-transparent hover:border-zinc-800"
+                    className="w-full text-left p-3 rounded-lg hover:bg-zinc-800/40 transition-colors text-sm font-medium text-zinc-400 hover:text-zinc-100 cursor-pointer"
                   >
                     {item.label}
                   </button>
                 ))
               ) : (
-                <p className="text-zinc-500 text-sm text-center mt-10 font-mono">No chapters found</p>
+                <p className="text-zinc-600 text-sm text-center mt-10">No chapters found</p>
               )
             )}
 
@@ -239,14 +239,14 @@ export function ReaderToolbar({
                       setShowSidebar(false);
                       onClose();
                     }}
-                    className="w-full text-left p-3 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 transition-colors text-sm cursor-pointer border-l-4 border-l-red-500"
+                    className="w-full text-left p-3 rounded-lg bg-zinc-900/40 hover:bg-zinc-800/50 border border-zinc-800/60 transition-colors text-sm cursor-pointer border-l-2 border-l-gold-500"
                   >
-                    <p className="font-semibold text-zinc-100 truncate">{bm.label || "Bookmark"}</p>
-                    <p className="text-xs text-zinc-500 font-mono mt-1">{new Date(bm.created_at).toLocaleDateString()}</p>
+                    <p className="font-medium text-zinc-200 truncate">{bm.label || "Bookmark"}</p>
+                    <p className="text-xs text-zinc-600 font-mono mt-1">{new Date(bm.created_at).toLocaleDateString()}</p>
                   </button>
                 ))
               ) : (
-                <p className="text-zinc-500 text-sm text-center mt-10 font-mono">No bookmarks yet</p>
+                <p className="text-zinc-600 text-sm text-center mt-10">No bookmarks yet</p>
               )
             )}
 
@@ -260,21 +260,21 @@ export function ReaderToolbar({
                       setShowSidebar(false);
                       onClose();
                     }}
-                    className="w-full text-left p-3 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 transition-colors text-sm cursor-pointer flex flex-col gap-1.5"
-                    style={{ borderLeft: `4px solid ${hl.color || '#ef4444'}` }}
+                    className="w-full text-left p-3 rounded-lg bg-zinc-900/40 hover:bg-zinc-800/50 border border-zinc-800/60 transition-colors text-sm cursor-pointer flex flex-col gap-1.5"
+                    style={{ borderLeft: `3px solid ${hl.color || '#d4a853'}` }}
                   >
                     {hl.text && <p className="italic text-zinc-300 text-xs line-clamp-2">&quot;{hl.text}&quot;</p>}
                     {hl.note && (
-                      <div className="flex items-start gap-1.5 mt-1.5 bg-zinc-950 p-2 rounded-lg border border-zinc-800">
-                        <MessageSquare className="w-3 h-3 text-red-400 mt-0.5 shrink-0" />
-                        <p className="text-xs text-zinc-200">{hl.note}</p>
+                      <div className="flex items-start gap-1.5 mt-1.5 bg-zinc-950/60 p-2 rounded-md border border-zinc-800/40">
+                        <MessageSquare className="w-3 h-3 text-gold-500 mt-0.5 shrink-0" />
+                        <p className="text-xs text-zinc-300">{hl.note}</p>
                       </div>
                     )}
-                    <p className="text-[10px] text-zinc-500 font-mono mt-1">{new Date(hl.created_at).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-zinc-600 font-mono mt-1">{new Date(hl.created_at).toLocaleDateString()}</p>
                   </button>
                 ))
               ) : (
-                <p className="text-zinc-500 text-sm text-center mt-10 font-mono">No highlights yet</p>
+                <p className="text-zinc-600 text-sm text-center mt-10">No highlights yet</p>
               )
             )}
 
@@ -292,16 +292,16 @@ export function ReaderToolbar({
                     placeholder="Search in book..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-600"
+                    className="flex-1 bg-[#111113] border border-[#1f1f23] rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-gold-500/40"
                   />
-                  <button type="submit" className="bg-red-600 p-2.5 rounded-xl cursor-pointer hover:bg-red-500 transition-colors shadow-md text-white">
+                  <button type="submit" className="bg-gold-500 p-2.5 rounded-lg cursor-pointer hover:bg-gold-400 transition-colors shadow-sm text-zinc-950">
                     <Search className="w-4 h-4" />
                   </button>
                 </form>
                 
-                <div className="space-y-2 mt-4">
+                <div className="space-y-1.5 mt-4">
                   {isSearching ? (
-                    <p className="text-zinc-500 text-sm text-center mt-10 font-mono">Searching...</p>
+                    <p className="text-zinc-600 text-sm text-center mt-10">Searching...</p>
                   ) : searchResults.length > 0 ? (
                     searchResults.map((res, idx) => (
                       <button
@@ -311,13 +311,13 @@ export function ReaderToolbar({
                           setShowSidebar(false);
                           onClose();
                         }}
-                        className="w-full text-left p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 hover:bg-zinc-800 transition-colors text-sm cursor-pointer"
+                        className="w-full text-left p-3 rounded-lg bg-zinc-900/40 border border-zinc-800/60 hover:bg-zinc-800/40 transition-colors text-sm cursor-pointer"
                       >
                         <p className="text-zinc-300 text-xs leading-relaxed" dangerouslySetInnerHTML={{ __html: res.excerpt }} />
                       </button>
                     ))
                   ) : searchQuery ? (
-                    <p className="text-zinc-500 text-sm text-center mt-10 font-mono">No results found</p>
+                    <p className="text-zinc-600 text-sm text-center mt-10">No results found</p>
                   ) : null}
                 </div>
               </div>
@@ -327,11 +327,11 @@ export function ReaderToolbar({
       )}
 
       {/* Bottom controls */}
-      <div className="pointer-events-auto absolute bottom-0 left-0 right-0 bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800/80 text-zinc-100 p-4 animate-fade-in shadow-2xl">
+      <div className="pointer-events-auto absolute bottom-0 left-0 right-0 bg-[#08080a]/92 backdrop-blur-2xl border-t border-zinc-800/40 text-zinc-100 p-4 animate-fade-in shadow-2xl">
         <div className="max-w-3xl mx-auto space-y-4">
           {/* Theme Row */}
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+            <span className="section-label">
               Theme
             </span>
             <div className="flex gap-2">
@@ -362,10 +362,10 @@ export function ReaderToolbar({
                   key={theme.value}
                   onClick={() => onSettingsChange({ theme: theme.value })}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
                     settings.theme === theme.value
-                      ? `${theme.bg} ${theme.text} shadow-md border-red-500/50`
-                      : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      ? `${theme.bg} ${theme.text} shadow-sm border-gold-500/30`
+                      : "bg-[#111113] border-[#1f1f23] text-zinc-500 hover:text-zinc-200"
                   )}
                 >
                   <theme.icon className="w-3 h-3" />
@@ -377,7 +377,7 @@ export function ReaderToolbar({
 
           {/* Font Size Row */}
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+            <span className="section-label">
               Font Size
             </span>
             <div className="flex items-center gap-3">
@@ -387,11 +387,11 @@ export function ReaderToolbar({
                     fontSize: Math.max(60, settings.fontSize - 10),
                   })
                 }
-                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 transition-colors cursor-pointer"
+                className="p-2 rounded-lg bg-[#111113] border border-[#1f1f23] hover:bg-zinc-800/60 text-zinc-400 transition-colors cursor-pointer"
               >
                 <Minus className="w-4 h-4" />
               </button>
-              <span className="text-sm w-12 text-center font-mono font-bold text-red-400">
+              <span className="text-sm w-12 text-center font-mono font-semibold text-gold-500">
                 {settings.fontSize}%
               </span>
               <button
@@ -400,7 +400,7 @@ export function ReaderToolbar({
                     fontSize: Math.min(200, settings.fontSize + 10),
                   })
                 }
-                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 transition-colors cursor-pointer"
+                className="p-2 rounded-lg bg-[#111113] border border-[#1f1f23] hover:bg-zinc-800/60 text-zinc-400 transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -409,7 +409,7 @@ export function ReaderToolbar({
 
           {/* Font Family Row */}
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+            <span className="section-label">
               Typography
             </span>
             <div className="flex gap-2">
@@ -422,10 +422,10 @@ export function ReaderToolbar({
                   key={font.value}
                   onClick={() => onSettingsChange({ fontFamily: font.value })}
                   className={cn(
-                    "px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border",
+                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
                     settings.fontFamily === font.value
-                      ? "bg-red-600 border-red-500 text-white font-semibold shadow-md"
-                      : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      ? "bg-gold-500 border-gold-400 text-zinc-950 font-semibold shadow-sm"
+                      : "bg-[#111113] border-[#1f1f23] text-zinc-500 hover:text-zinc-200"
                   )}
                 >
                   <Type className="w-3 h-3 inline mr-1" />
@@ -437,16 +437,16 @@ export function ReaderToolbar({
           
           {/* Custom CSS Toggle */}
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+            <span className="section-label">
               Disable Publisher CSS
             </span>
             <button
               onClick={() => onSettingsChange({ disablePublisherCSS: !settings.disablePublisherCSS })}
               className={cn(
-                "px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border",
+                "px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border",
                 settings.disablePublisherCSS
-                  ? "bg-red-600 border-red-500 text-white font-semibold shadow-md"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                  ? "bg-gold-500 border-gold-400 text-zinc-950 font-semibold shadow-sm"
+                  : "bg-[#111113] border-[#1f1f23] text-zinc-500 hover:text-zinc-200"
               )}
             >
               {settings.disablePublisherCSS ? "On" : "Off"}
@@ -458,4 +458,3 @@ export function ReaderToolbar({
     </div>
   );
 }
-

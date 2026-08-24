@@ -89,7 +89,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 border-2 border-zinc-800 border-t-red-600 rounded-full animate-spin" />
+        <div className="w-7 h-7 border-2 border-zinc-800 border-t-gold-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -98,20 +98,20 @@ export default function SettingsPage() {
     <div className="max-w-2xl mx-auto px-4 md:px-8 py-8 text-zinc-100">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-zinc-100 mb-1">Settings</h1>
-        <p className="text-zinc-400 text-sm">Customize your reading experience & account</p>
+        <h1 className="text-2xl font-bold text-zinc-100 mb-1">Settings</h1>
+        <p className="text-zinc-500 text-sm">Customize your reading experience & account</p>
       </div>
 
       {/* Account Section */}
-      <div className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-6 shadow-xl backdrop-blur-md mb-6">
+      <div className="card rounded-xl p-6 mb-4">
         <div className="flex items-center gap-2 mb-4">
-          <UserIcon className="w-5 h-5 text-red-500" />
-          <h2 className="text-lg font-bold text-zinc-100">Account</h2>
+          <UserIcon className="w-4 h-4 text-gold-500" />
+          <h2 className="text-base font-semibold text-zinc-100">Account</h2>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-zinc-400 font-mono mb-1.5 block">Email Address</label>
-            <div className="px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-200 text-sm font-mono">
+            <label className="text-[11px] text-zinc-500 font-mono mb-1.5 block uppercase tracking-wider">Email Address</label>
+            <div className="px-4 py-2.5 rounded-lg bg-[#08080a] border border-[#1f1f23] text-zinc-300 text-sm font-mono">
               {email}
             </div>
           </div>
@@ -119,16 +119,16 @@ export default function SettingsPage() {
       </div>
 
       {/* Reading Goal Section */}
-      <div className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-6 shadow-xl backdrop-blur-md mb-6">
+      <div className="card rounded-xl p-6 mb-4">
         <div className="flex items-center gap-2 mb-4">
-          <Target className="w-5 h-5 text-red-500" />
-          <h2 className="text-lg font-bold text-zinc-100">
+          <Target className="w-4 h-4 text-gold-500" />
+          <h2 className="text-base font-semibold text-zinc-100">
             Daily Reading Goal
           </h2>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-zinc-400 font-mono mb-2 block">
+            <label className="text-[11px] text-zinc-500 font-mono mb-2 block uppercase tracking-wider">
               Target Minutes per Day
             </label>
             <div className="flex items-center gap-4">
@@ -139,13 +139,13 @@ export default function SettingsPage() {
                 step={5}
                 value={dailyGoal}
                 onChange={(e) => setDailyGoal(Number(e.target.value))}
-                className="flex-1 accent-red-600 cursor-pointer"
+                className="flex-1 accent-gold-500 cursor-pointer"
               />
-              <div className="w-16 text-center px-3 py-1.5 rounded-xl bg-red-950/60 border border-red-900/50 text-red-400 font-bold text-sm font-mono">
+              <div className="w-14 text-center px-3 py-1.5 rounded-lg bg-gold-500/8 border border-gold-500/15 text-gold-400 font-semibold text-sm font-mono">
                 {dailyGoal}m
               </div>
             </div>
-            <div className="flex justify-between text-[11px] text-zinc-500 font-mono mt-1.5">
+            <div className="flex justify-between text-[11px] text-zinc-600 font-mono mt-1.5">
               <span>5 min</span>
               <span>3 hrs</span>
             </div>
@@ -154,7 +154,7 @@ export default function SettingsPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-semibold text-sm shadow-lg shadow-red-950/60 transition-all disabled:opacity-50 cursor-pointer border border-red-500/30"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gold-500 hover:bg-gold-400 text-zinc-950 font-semibold text-sm transition-all disabled:opacity-50 cursor-pointer"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -167,16 +167,16 @@ export default function SettingsPage() {
       </div>
 
       {/* Data Section */}
-      <div className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-6 shadow-xl backdrop-blur-md mb-6">
+      <div className="card rounded-xl p-6 mb-4">
         <div className="flex items-center gap-2 mb-4">
-          <Download className="w-5 h-5 text-red-500" />
-          <h2 className="text-lg font-bold text-zinc-100">
+          <Download className="w-4 h-4 text-gold-500" />
+          <h2 className="text-base font-semibold text-zinc-100">
             Export Data
           </h2>
         </div>
         <div className="space-y-4">
           <div>
-            <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+            <p className="text-xs text-zinc-500 leading-relaxed mb-4">
               Download a complete JSON backup of your account data, including your reading history, shelves, tags, bookmarks, and highlights.
             </p>
           </div>
@@ -184,7 +184,7 @@ export default function SettingsPage() {
           <button
             onClick={handleExportData}
             disabled={exporting}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200 font-medium text-sm hover:bg-zinc-700 transition-colors disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 font-medium text-sm hover:bg-zinc-700/60 transition-colors disabled:opacity-50 cursor-pointer"
           >
             {exporting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -197,10 +197,10 @@ export default function SettingsPage() {
       </div>
 
       {/* Sign Out */}
-      <div className="rounded-3xl bg-zinc-900/80 border border-red-950/60 p-6 shadow-xl backdrop-blur-md">
+      <div className="card rounded-xl border-red-950/40 p-6">
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-950/50 border border-red-900/60 text-red-400 font-medium text-sm hover:bg-red-900/40 transition-colors cursor-pointer"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-950/30 border border-red-900/40 text-red-400/80 font-medium text-sm hover:bg-red-900/30 transition-colors cursor-pointer"
         >
           <LogOut className="w-4 h-4" />
           Sign Out
@@ -209,4 +209,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

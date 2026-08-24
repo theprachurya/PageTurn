@@ -17,7 +17,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/90 backdrop-blur-xl border-t border-zinc-800/80 safe-area-bottom">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#08080a]/92 backdrop-blur-2xl border-t border-zinc-800/40 safe-area-bottom">
       <div className="flex items-center justify-around px-2 py-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
@@ -26,23 +26,23 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 min-w-[60px] relative",
+                "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200 min-w-[56px] relative",
                 isActive
-                  ? "text-red-500"
-                  : "text-zinc-500 hover:text-zinc-300"
+                  ? "text-gold-500"
+                  : "text-zinc-600 hover:text-zinc-400"
               )}
             >
-              <item.icon className={cn("w-5 h-5", isActive && "text-red-500")} />
+              <item.icon className={cn("w-5 h-5", isActive && "text-gold-500")} />
               <span
                 className={cn(
                   "text-[10px] font-medium",
-                  isActive ? "text-red-400 font-semibold" : "text-zinc-500"
+                  isActive ? "text-gold-400 font-semibold" : "text-zinc-600"
                 )}
               >
                 {item.label}
               </span>
               {isActive && (
-                <div className="absolute top-0 w-6 h-0.5 bg-red-500 rounded-full" />
+                <div className="absolute top-0 w-5 h-0.5 bg-gold-500 rounded-full" />
               )}
             </Link>
           );
@@ -51,4 +51,3 @@ export function BottomNav() {
     </nav>
   );
 }
-

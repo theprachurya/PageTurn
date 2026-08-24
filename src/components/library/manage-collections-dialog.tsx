@@ -104,7 +104,7 @@ export function ManageCollectionsDialog({ bookId, bookTitle, initialTags, initia
     setIsSubmitting(true);
     try {
       if (activeTab === "tags") {
-        const newTag = await createTag(newItemName.trim(), "#dc2626");
+        const newTag = await createTag(newItemName.trim(), "#d4a853");
         setAllTags(prev => [...prev, newTag].sort((a, b) => a.name.localeCompare(b.name)));
         await applyTagToBook(bookId, newTag.id);
         setBookTags(prev => new Set(prev).add(newTag.id));
@@ -125,52 +125,52 @@ export function ManageCollectionsDialog({ bookId, bookTitle, initialTags, initia
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 text-zinc-100">
-        <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
-          <h2 className="font-bold text-zinc-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in">
+      <div className="bg-[#111113] border border-[#1f1f23] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl shadow-black/60 animate-in zoom-in-95 text-zinc-100">
+        <div className="p-4 border-b border-zinc-800/40 flex items-center justify-between bg-[#0c0c0e]/60">
+          <h2 className="font-semibold text-zinc-100">
             Organize Book
           </h2>
-          <button onClick={onClose} className="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg">
+          <button onClick={onClose} className="p-1.5 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/60 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
         
-        <div className="px-4 pt-4 bg-zinc-950/40 border-b border-zinc-800">
-          <p className="text-sm text-zinc-400 mb-4 truncate">
-            Managing: <span className="font-semibold text-zinc-200">{bookTitle}</span>
+        <div className="px-4 pt-4 bg-[#0c0c0e]/30 border-b border-zinc-800/40">
+          <p className="text-sm text-zinc-500 mb-4 truncate">
+            Managing: <span className="font-medium text-zinc-200">{bookTitle}</span>
           </p>
           
           <div className="flex gap-4">
             <button 
               onClick={() => setActiveTab("tags")}
-              className={cn("pb-2 text-sm font-medium border-b-2 transition-colors", activeTab === "tags" ? "border-red-500 text-red-400 font-semibold" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+              className={cn("pb-2 text-sm font-medium border-b-2 transition-colors", activeTab === "tags" ? "border-gold-500 text-gold-400 font-semibold" : "border-transparent text-zinc-500 hover:text-zinc-200")}
             >
               <span className="flex items-center gap-1.5"><TagIcon className="w-3.5 h-3.5" /> Tags</span>
             </button>
             <button 
               onClick={() => setActiveTab("shelves")}
-              className={cn("pb-2 text-sm font-medium border-b-2 transition-colors", activeTab === "shelves" ? "border-red-500 text-red-400 font-semibold" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+              className={cn("pb-2 text-sm font-medium border-b-2 transition-colors", activeTab === "shelves" ? "border-gold-500 text-gold-400 font-semibold" : "border-transparent text-zinc-500 hover:text-zinc-200")}
             >
               <span className="flex items-center gap-1.5"><Folder className="w-3.5 h-3.5" /> Shelves</span>
             </button>
           </div>
         </div>
 
-        <div className="p-4 bg-zinc-900 border-b border-zinc-800">
+        <div className="p-4 bg-[#111113] border-b border-zinc-800/40">
           <form onSubmit={handleCreate} className="flex gap-2">
             <input
               type="text"
               placeholder={`Create new ${activeTab === "tags" ? "tag" : "shelf"}...`}
               value={newItemName}
               onChange={(e) => setNewItemName(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-700 text-sm text-zinc-100 focus:outline-none focus:border-red-600 placeholder-zinc-500"
+              className="flex-1 px-3 py-2 rounded-lg bg-[#08080a] border border-[#1f1f23] text-sm text-zinc-100 focus:outline-none focus:border-gold-500/40 placeholder-zinc-600"
               disabled={isSubmitting}
             />
             <button 
               type="submit"
               disabled={isSubmitting || !newItemName.trim()}
-              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors cursor-pointer"
+              className="px-3 py-2 bg-gold-500 text-zinc-950 rounded-lg hover:bg-gold-400 disabled:opacity-50 transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -179,10 +179,10 @@ export function ManageCollectionsDialog({ bookId, bookTitle, initialTags, initia
 
         <div className="p-4 max-h-64 overflow-y-auto">
           {loading ? (
-            <div className="flex justify-center p-4"><Loader2 className="w-5 h-5 animate-spin text-red-500" /></div>
+            <div className="flex justify-center p-4"><Loader2 className="w-5 h-5 animate-spin text-gold-500" /></div>
           ) : activeTab === "tags" ? (
             allTags.length === 0 ? (
-              <p className="text-center text-sm text-zinc-500 py-4 font-mono">No tags created yet.</p>
+              <p className="text-center text-sm text-zinc-600 py-4">No tags created yet.</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {allTags.map((tag) => {
@@ -194,10 +194,10 @@ export function ManageCollectionsDialog({ bookId, bookTitle, initialTags, initia
                       disabled={isSubmitting}
                       className={cn(
                         "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1.5",
-                        isActive ? "bg-red-950/60 border-red-800 text-red-300 font-semibold" : "bg-zinc-800/80 border-zinc-700 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100"
+                        isActive ? "bg-gold-500/10 border-gold-500/20 text-gold-400 font-semibold" : "bg-zinc-800/60 border-zinc-700/60 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
                       )}
                     >
-                      {isActive && <CheckIcon className="w-3 h-3 text-red-400" />}
+                      {isActive && <CheckIcon className="w-3 h-3 text-gold-500" />}
                       {tag.name}
                     </button>
                   );
@@ -206,7 +206,7 @@ export function ManageCollectionsDialog({ bookId, bookTitle, initialTags, initia
             )
           ) : (
             allShelves.length === 0 ? (
-              <p className="text-center text-sm text-zinc-500 py-4 font-mono">No shelves created yet.</p>
+              <p className="text-center text-sm text-zinc-600 py-4">No shelves created yet.</p>
             ) : (
               <div className="space-y-1.5">
                 {allShelves.map((shelf) => {
@@ -218,12 +218,12 @@ export function ManageCollectionsDialog({ bookId, bookTitle, initialTags, initia
                       disabled={isSubmitting}
                       className={cn(
                         "w-full px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors cursor-pointer flex items-center gap-2",
-                        isActive ? "bg-red-950/40 border-red-900/60 text-red-300 font-semibold" : "bg-zinc-800/60 border-zinc-700/60 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100"
+                        isActive ? "bg-gold-500/8 border-gold-500/15 text-gold-400 font-semibold" : "bg-zinc-800/40 border-zinc-700/40 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
                       )}
                     >
-                      <Folder className={cn("w-4 h-4", isActive ? "fill-current text-red-500" : "text-zinc-500")} />
+                      <Folder className={cn("w-4 h-4", isActive ? "fill-current text-gold-500" : "text-zinc-600")} />
                       <span className="flex-1 text-left">{shelf.name}</span>
-                      {isActive && <CheckIcon className="w-4 h-4 text-red-400" />}
+                      {isActive && <CheckIcon className="w-4 h-4 text-gold-500" />}
                     </button>
                   );
                 })}
@@ -232,10 +232,10 @@ export function ManageCollectionsDialog({ bookId, bookTitle, initialTags, initia
           )}
         </div>
         
-        <div className="p-4 border-t border-zinc-800 bg-zinc-950/50 flex justify-end">
+        <div className="p-4 border-t border-zinc-800/40 bg-[#0c0c0e]/40 flex justify-end">
           <button 
             onClick={onClose}
-            className="px-5 py-2 bg-zinc-800 text-zinc-100 border border-zinc-700 rounded-xl text-sm font-semibold hover:bg-zinc-700 cursor-pointer"
+            className="px-5 py-2 bg-zinc-800/60 text-zinc-200 border border-zinc-700/60 rounded-lg text-sm font-medium hover:bg-zinc-700/60 cursor-pointer"
           >
             Done
           </button>
@@ -252,4 +252,3 @@ function CheckIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-

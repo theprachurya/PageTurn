@@ -149,7 +149,7 @@ export default function HistoryPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="w-8 h-8 border-2 border-zinc-800 border-t-red-600 rounded-full animate-spin" />
+        <div className="w-7 h-7 border-2 border-zinc-800 border-t-gold-500 rounded-full animate-spin" />
       </div>
     );
   }
@@ -158,19 +158,19 @@ export default function HistoryPage() {
     <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 text-zinc-100">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-zinc-100 mb-1">
+        <h1 className="text-2xl font-bold text-zinc-100 mb-1">
           Reading History
         </h1>
-        <p className="text-zinc-400 text-sm">Track your reading journey & streaks</p>
+        <p className="text-zinc-500 text-sm">Track your reading journey & streaks</p>
       </div>
 
       {/* Stats Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Daily Goal Card */}
-        <div className="rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 border border-red-900/40 p-6 text-zinc-100 shadow-2xl shadow-red-950/30">
+        <div className="card rounded-xl border-gold-500/15 p-6 text-zinc-100">
           <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-4 h-4 text-red-500" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-red-400">
+            <TrendingUp className="w-4 h-4 text-gold-500" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gold-500">
               Daily Goal
             </span>
           </div>
@@ -178,7 +178,7 @@ export default function HistoryPage() {
             currentMinutes={todayMinutes}
             goalMinutes={dailyGoal}
           />
-          <p className="text-center text-xs text-zinc-400 font-mono mt-3">
+          <p className="text-center text-xs text-zinc-500 mt-3">
             {todayMinutes >= dailyGoal
               ? "🎉 Goal reached!"
               : `${dailyGoal - todayMinutes} min remaining`}
@@ -186,84 +186,84 @@ export default function HistoryPage() {
         </div>
 
         {/* Reading Streak Card */}
-        <div className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-6 shadow-xl backdrop-blur-md">
+        <div className="card rounded-xl p-6">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-red-950/60 border border-red-900/40 flex items-center justify-center">
-              <Flame className="w-4 h-4 text-red-500 animate-pulse" />
+            <div className="w-7 h-7 rounded-lg bg-gold-500/8 flex items-center justify-center">
+              <Flame className="w-3.5 h-3.5 text-gold-500" />
             </div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
               Reading Streak
             </span>
           </div>
           <div className="flex items-baseline gap-1 mb-1">
-            <span className="text-4xl font-extrabold text-zinc-100">{streak}</span>
-            <span className="text-xs text-zinc-500 font-mono">days</span>
+            <span className="text-3xl font-bold text-zinc-100">{streak}</span>
+            <span className="text-xs text-zinc-600 font-mono">days</span>
           </div>
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-zinc-500">
             {streak > 0
-              ? "Keep the crimson flame alive! 🔥"
+              ? "Keep the flame alive! 🔥"
               : "Start reading today to build a streak"}
           </p>
         </div>
 
         {/* Books Read Card */}
-        <div className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-6 shadow-xl backdrop-blur-md">
+        <div className="card rounded-xl p-6">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
-              <BookCheck className="w-4 h-4 text-red-400" />
+            <div className="w-7 h-7 rounded-lg bg-zinc-800/60 flex items-center justify-center">
+              <BookCheck className="w-3.5 h-3.5 text-gold-400" />
             </div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500">
               Books Read
             </span>
           </div>
           <div className="flex items-baseline gap-1 mb-1">
-            <span className="text-4xl font-extrabold text-zinc-100">
+            <span className="text-3xl font-bold text-zinc-100">
               {totalBooksRead}
             </span>
-            <span className="text-xs text-zinc-500 font-mono">completed</span>
+            <span className="text-xs text-zinc-600 font-mono">completed</span>
           </div>
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-zinc-500">
             {currentlyReading} currently reading
           </p>
         </div>
       </div>
 
       {/* Heatmap Card */}
-      <div className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-6 shadow-xl backdrop-blur-md mb-6">
+      <div className="card rounded-xl p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
-          <Flame className="w-5 h-5 text-red-500" />
-          <h2 className="text-lg font-bold text-zinc-100">
-            Reading Activity Heatmap
+          <Flame className="w-4 h-4 text-gold-500" />
+          <h2 className="text-base font-semibold text-zinc-100">
+            Reading Activity
           </h2>
         </div>
         <StreakHeatmap sessionsByDate={sessionsByDate} />
       </div>
 
       {/* Recent Sessions */}
-      <div className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-6 shadow-xl backdrop-blur-md">
+      <div className="card rounded-xl p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Clock className="w-5 h-5 text-red-500" />
-          <h2 className="text-lg font-bold text-zinc-100">
+          <Clock className="w-4 h-4 text-gold-500" />
+          <h2 className="text-base font-semibold text-zinc-100">
             Recent Sessions
           </h2>
         </div>
 
         {recentSessions.length === 0 ? (
           <div className="text-center py-8">
-            <BookOpen className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-            <p className="text-sm text-zinc-500">
+            <BookOpen className="w-8 h-8 text-zinc-800 mx-auto mb-3" />
+            <p className="text-sm text-zinc-600">
               No reading sessions yet. Open a book to start tracking!
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1">
             {recentSessions.map((session) => (
               <div
                 key={session.id}
-                className="flex items-center gap-4 p-3 rounded-xl hover:bg-zinc-800/60 transition-colors border border-transparent hover:border-zinc-700/60"
+                className="flex items-center gap-4 p-3 rounded-lg hover:bg-zinc-800/30 transition-colors border border-transparent hover:border-zinc-800/50"
               >
                 {/* Book cover */}
-                <div className="w-10 h-14 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 flex-shrink-0">
+                <div className="w-9 h-13 rounded-md overflow-hidden bg-zinc-950 border border-zinc-800/60 flex-shrink-0">
                   {session.books?.cover_url ? (
                     <img
                       src={session.books.cover_url}
@@ -272,18 +272,18 @@ export default function HistoryPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-zinc-950">
-                      <BookOpen className="w-4 h-4 text-zinc-700" />
+                      <BookOpen className="w-3.5 h-3.5 text-zinc-700" />
                     </div>
                   )}
                 </div>
 
                 {/* Session info */}
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-semibold text-zinc-100 truncate">
+                  <h4 className="text-sm font-medium text-zinc-200 truncate">
                     {session.books?.title || "Unknown Book"}
                   </h4>
                   {session.chapter_name && (
-                    <p className="text-xs text-zinc-400 truncate">
+                    <p className="text-xs text-zinc-600 truncate">
                       {session.chapter_name}
                     </p>
                   )}
@@ -291,10 +291,10 @@ export default function HistoryPage() {
 
                 {/* Duration & time */}
                 <div className="text-right flex-shrink-0">
-                  <div className="text-sm font-bold text-red-400 font-mono">
+                  <div className="text-sm font-semibold text-gold-500 font-mono">
                     {session.duration_minutes} min
                   </div>
-                  <div className="text-[11px] text-zinc-500">
+                  <div className="text-[11px] text-zinc-600">
                     {formatDistanceToNow(new Date(session.start_time), {
                       addSuffix: true,
                     })}
@@ -308,4 +308,3 @@ export default function HistoryPage() {
     </div>
   );
 }
-

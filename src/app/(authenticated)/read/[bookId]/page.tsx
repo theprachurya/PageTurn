@@ -105,10 +105,10 @@ export default function ReadPage() {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white">
+      <div className="fixed inset-0 flex items-center justify-center bg-[#08080a]">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-slate-500">{loadingStatus}</p>
+          <div className="w-8 h-8 border-2 border-zinc-800 border-t-gold-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-zinc-500">{loadingStatus}</p>
         </div>
       </div>
     );
@@ -116,12 +116,12 @@ export default function ReadPage() {
 
   if (error) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white">
+      <div className="fixed inset-0 flex items-center justify-center bg-[#08080a]">
         <div className="text-center">
-          <p className="text-lg text-red-500 mb-4">{error}</p>
+          <p className="text-lg text-red-400 mb-4">{error}</p>
           <button
             onClick={() => router.push("/shelf")}
-            className="px-4 py-2 rounded-xl bg-purple-100 text-purple-700 text-sm font-medium hover:bg-purple-200 transition-colors cursor-pointer"
+            className="px-5 py-2.5 rounded-lg bg-gold-500/10 text-gold-400 text-sm font-medium hover:bg-gold-500/15 transition-colors cursor-pointer border border-gold-500/20"
           >
             Back to Shelf
           </button>

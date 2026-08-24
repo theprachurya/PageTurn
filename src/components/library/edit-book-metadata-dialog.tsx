@@ -56,15 +56,15 @@ export function EditBookMetadataDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !saving) onClose();
       }}
     >
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
+      <div className="w-full max-w-lg rounded-2xl border border-[#1f1f23] bg-[#111113] shadow-2xl shadow-black/60">
+        <div className="flex items-center justify-between border-b border-zinc-800/60 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-950/50 text-red-400">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold-500/8 text-gold-500">
               <BookOpen className="h-4 w-4" />
             </div>
             <div>
@@ -76,7 +76,7 @@ export function EditBookMetadataDialog({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200 disabled:opacity-50"
+            className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-200 disabled:opacity-50"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -85,70 +85,70 @@ export function EditBookMetadataDialog({
 
         <form onSubmit={handleSave} className="space-y-4 p-5">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">Title *</label>
+            <label className="mb-1.5 block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Title *</label>
             <input
               required
               value={metadata.title}
               onChange={(event) => setField("title", event.target.value)}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-red-600"
+              className="w-full rounded-lg border border-[#1f1f23] bg-[#08080a] px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-gold-500/40"
               placeholder="Book title"
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">Author</label>
+            <label className="mb-1.5 block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Author</label>
             <input
               value={metadata.author}
               onChange={(event) => setField("author", event.target.value)}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-red-600"
+              className="w-full rounded-lg border border-[#1f1f23] bg-[#08080a] px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-gold-500/40"
               placeholder="Author name"
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">Description</label>
+            <label className="mb-1.5 block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Description</label>
             <textarea
               value={metadata.description}
               onChange={(event) => setField("description", event.target.value)}
               rows={4}
-              className="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-red-600"
+              className="w-full resize-none rounded-lg border border-[#1f1f23] bg-[#08080a] px-3.5 py-2.5 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-gold-500/40"
               placeholder="Book description"
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">Cover URL</label>
+            <label className="mb-1.5 block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Cover URL</label>
             <div className="relative">
               <Image className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
               <input
                 type="url"
                 value={metadata.cover_url}
                 onChange={(event) => setField("cover_url", event.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 py-2.5 pl-9 pr-3.5 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-red-600"
+                className="w-full rounded-lg border border-[#1f1f23] bg-[#08080a] py-2.5 pl-9 pr-3.5 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-gold-500/40"
                 placeholder="https://example.com/cover.jpg"
               />
             </div>
           </div>
 
           {error && (
-            <p className="rounded-xl border border-red-900/60 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-400">
+            <p className="rounded-lg border border-red-900/40 bg-red-950/30 px-3.5 py-2.5 text-sm text-red-400/80">
               {error}
             </p>
           )}
 
-          <div className="flex justify-end gap-2 border-t border-zinc-800 pt-4">
+          <div className="flex justify-end gap-2 border-t border-zinc-800/40 pt-4">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="rounded-xl border border-zinc-800 px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-900 disabled:opacity-50"
+              className="rounded-lg border border-zinc-800/60 px-4 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800/40 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || !metadata.title.trim()}
-              className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-gold-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition-colors hover:bg-gold-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {saving ? "Saving..." : "Save Changes"}

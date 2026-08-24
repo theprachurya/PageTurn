@@ -34,13 +34,13 @@ export function ProgressRing({
           stroke="currentColor"
           strokeWidth={strokeWidth}
           fill="none"
-          className="text-zinc-800"
+          className="text-zinc-800/60"
         />
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="url(#progress-gradient-crimson)"
+          stroke="url(#progress-gradient-gold)"
           strokeWidth={strokeWidth}
           fill="none"
           strokeLinecap="round"
@@ -51,18 +51,17 @@ export function ProgressRing({
           }}
         />
         <defs>
-          <linearGradient id="progress-gradient-crimson" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#ef4444" />
-            <stop offset="100%" stopColor="#be123c" />
+          <linearGradient id="progress-gradient-gold" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#f5c563" />
+            <stop offset="100%" stopColor="#d4a853" />
           </linearGradient>
         </defs>
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-[10px] font-bold text-red-400">
+        <span className="text-[10px] font-bold text-gold-500">
           {Math.round(percentage)}%
         </span>
       </div>
     </div>
   );
 }
-

@@ -21,13 +21,13 @@ export const HIGHLIGHT_COLORS = [
 export function HighlightActionBar({ x, y, onHighlight, onDefine, onClose }: HighlightActionBarProps) {
   return (
     <div
-      className="fixed z-40 bg-slate-900 text-white rounded-xl shadow-2xl flex items-center p-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200"
+      className="fixed z-40 bg-[#151517] text-white rounded-xl shadow-2xl shadow-black/60 flex items-center p-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 border border-zinc-800/60"
       style={{
         top: Math.max(10, y - 50),
         left: Math.max(10, Math.min(window.innerWidth - 220, x - 100)),
       }}
     >
-      <div className="flex items-center gap-1 pr-2 border-r border-slate-700">
+      <div className="flex items-center gap-1 pr-2 border-r border-zinc-700/60">
         {HIGHLIGHT_COLORS.map((c) => (
           <button
             key={c.id}
@@ -41,7 +41,7 @@ export function HighlightActionBar({ x, y, onHighlight, onDefine, onClose }: Hig
       
       <button
         onClick={onDefine}
-        className="flex items-center gap-1 px-3 py-1 text-xs font-medium hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-3 py-1 text-xs font-medium hover:bg-zinc-800/60 rounded-lg transition-colors cursor-pointer text-zinc-300"
       >
         <BookA className="w-4 h-4" />
         Define
@@ -49,7 +49,7 @@ export function HighlightActionBar({ x, y, onHighlight, onDefine, onClose }: Hig
 
       <button
         onClick={onClose}
-        className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer ml-1"
+        className="p-1.5 hover:bg-zinc-800/60 rounded-lg transition-colors cursor-pointer ml-1 text-zinc-400"
       >
         <X className="w-4 h-4" />
       </button>

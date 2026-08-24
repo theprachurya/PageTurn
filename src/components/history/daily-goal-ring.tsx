@@ -29,7 +29,7 @@ export function DailyGoalRing({
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke="#27272a"
+            stroke="#1f1f23"
             strokeWidth={strokeWidth}
             fill="none"
           />
@@ -37,7 +37,7 @@ export function DailyGoalRing({
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke="url(#goal-gradient-crimson)"
+            stroke="url(#goal-gradient-gold)"
             strokeWidth={strokeWidth}
             fill="none"
             strokeLinecap="round"
@@ -49,23 +49,22 @@ export function DailyGoalRing({
           />
           <defs>
             <linearGradient
-              id="goal-gradient-crimson"
+              id="goal-gradient-gold"
               x1="0%"
               y1="0%"
               x2="100%"
               y2="0%"
             >
-              <stop offset="0%" stopColor="#ef4444" />
-              <stop offset="100%" stopColor="#dc2626" />
+              <stop offset="0%" stopColor="#f5c563" />
+              <stop offset="100%" stopColor="#d4a853" />
             </linearGradient>
           </defs>
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-extrabold text-zinc-100">{currentMinutes}</span>
-          <span className="text-xs font-mono text-zinc-400">/ {goalMinutes} min</span>
+          <span className="text-2xl font-bold text-zinc-100">{currentMinutes}</span>
+          <span className="text-xs font-mono text-zinc-500">/ {goalMinutes} min</span>
         </div>
       </div>
     </div>
   );
 }
-

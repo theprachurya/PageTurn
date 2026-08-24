@@ -50,7 +50,7 @@ export function HighlightPopover({
   return (
     <div 
       style={style}
-      className="w-64 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 animate-in fade-in zoom-in-95 duration-200"
+      className="w-64 bg-[#151517] rounded-xl shadow-2xl shadow-black/60 border border-zinc-800/60 p-3 animate-in fade-in zoom-in-95 duration-200"
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex gap-2">
@@ -60,14 +60,14 @@ export function HighlightPopover({
               onClick={() => setColor(c)}
               className={cn(
                 "w-6 h-6 rounded-full border-2 transition-transform",
-                color === c ? "scale-110 border-slate-400 dark:border-slate-500" : "border-transparent hover:scale-105"
+                color === c ? "scale-110 border-zinc-400" : "border-transparent hover:scale-105"
               )}
               style={{ backgroundColor: HIGHLIGHT_COLORS[c] }}
               aria-label={`Select ${c} color`}
             />
           ))}
         </div>
-        <button onClick={onClose} className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500">
+        <button onClick={onClose} className="p-1 rounded-md hover:bg-zinc-800/60 text-zinc-500">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -79,13 +79,13 @@ export function HighlightPopover({
             placeholder="Add a note..."
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full h-20 p-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none text-slate-900 dark:text-slate-100"
+            className="w-full h-20 p-2 text-sm bg-[#111113] border border-zinc-800/60 rounded-lg focus:outline-none focus:ring-1 focus:ring-gold-500/40 resize-none text-zinc-100 placeholder-zinc-600"
           />
         </div>
       ) : (
         <button 
           onClick={() => setIsEditingNote(true)}
-          className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md transition-colors mb-2"
+          className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-zinc-500 hover:bg-zinc-800/40 rounded-md transition-colors mb-2"
         >
           <MessageSquare className="w-4 h-4" />
           <span>Add Note</span>
@@ -95,7 +95,7 @@ export function HighlightPopover({
       <div className="flex items-center gap-2 mt-2">
         <button
           onClick={() => onSave(color, note)}
-          className="flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-1.5 rounded-lg text-sm font-medium transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-400 text-zinc-950 py-1.5 rounded-lg text-sm font-semibold transition-colors"
         >
           <Check className="w-4 h-4" />
           {isExisting ? "Update" : "Save"}
@@ -103,7 +103,7 @@ export function HighlightPopover({
         {isExisting && onDelete && (
           <button
             onClick={onDelete}
-            className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+            className="px-3 py-1.5 text-sm font-medium text-red-400/80 hover:bg-red-950/20 rounded-lg transition-colors"
           >
             Delete
           </button>

@@ -131,7 +131,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-medium text-sm shadow-lg shadow-red-950/60 hover:shadow-red-800/40 hover:scale-[1.02] transition-all duration-300 cursor-pointer border border-red-500/30"
+        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-zinc-950 font-semibold text-sm transition-all duration-200 cursor-pointer"
       >
         <Upload className="w-4 h-4" />
         Upload Book
@@ -141,17 +141,17 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/75 backdrop-blur-md animate-fade-in"
+            className="absolute inset-0 bg-black/70 backdrop-blur-md animate-fade-in"
             onClick={handleClose}
           />
 
-          <div className="relative bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl max-w-lg w-full p-6 animate-slide-up text-zinc-100 z-10">
+          <div className="relative bg-[#111113] border border-[#1f1f23] rounded-2xl shadow-2xl shadow-black/60 max-w-lg w-full p-6 animate-slide-up text-zinc-100 z-10">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-zinc-100">Upload Book</h2>
+              <h2 className="text-lg font-semibold text-zinc-100">Upload Book</h2>
               <button
                 onClick={handleClose}
-                className="p-2 rounded-xl hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                className="p-2 rounded-lg hover:bg-zinc-800/60 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -167,29 +167,29 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
                 className={cn(
-                  "border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300",
+                  "border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300",
                   isDragging
-                    ? "border-red-500 bg-red-950/30"
-                    : "border-zinc-800 hover:border-red-900/60 hover:bg-zinc-950/50"
+                    ? "border-gold-500/60 bg-gold-500/[0.04]"
+                    : "border-zinc-800/80 hover:border-gold-500/20 hover:bg-zinc-900/30"
                 )}
               >
                 {isExtracting ? (
                   <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
-                    <p className="text-sm text-red-400">
+                    <Loader2 className="w-8 h-8 text-gold-500 animate-spin" />
+                    <p className="text-sm text-gold-400/80">
                       Checking file & extracting metadata...
                     </p>
                   </div>
                 ) : (
                   <>
-                    <BookOpen className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
+                    <BookOpen className="w-10 h-10 text-zinc-700 mx-auto mb-4" />
                     <p className="text-sm text-zinc-300 mb-1 font-medium">
                       Drag & drop your .epub file here
                     </p>
-                    <p className="text-xs text-zinc-500 mb-4">Max 100 MB · No DRM</p>
+                    <p className="text-xs text-zinc-600 mb-4">Max 100 MB · No DRM</p>
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-medium hover:bg-zinc-700 hover:text-white transition-colors cursor-pointer"
+                      className="px-4 py-2 rounded-lg bg-zinc-800/60 text-zinc-200 border border-zinc-700/60 text-sm font-medium hover:bg-zinc-700/60 hover:text-white transition-colors cursor-pointer"
                     >
                       Browse Files
                     </button>
@@ -207,7 +207,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
               /* Preview */
               <div className="space-y-4">
                 <div className="flex gap-4">
-                  <div className="w-28 h-40 rounded-xl overflow-hidden bg-zinc-950 border border-zinc-800 flex-shrink-0">
+                  <div className="w-24 h-36 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800/60 flex-shrink-0">
                     {coverPreview ? (
                       <img
                         src={coverPreview}
@@ -216,7 +216,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="w-10 h-10 text-zinc-700" />
+                        <BookOpen className="w-8 h-8 text-zinc-700" />
                       </div>
                     )}
                   </div>
@@ -224,9 +224,9 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                     <h3 className="font-semibold text-zinc-100 truncate">
                       {bookData.title}
                     </h3>
-                    <p className="text-sm text-zinc-400 mb-1">{bookData.author}</p>
+                    <p className="text-sm text-zinc-500 mb-1">{bookData.author}</p>
                     {bookData.description && (
-                      <p className="text-xs text-zinc-500 line-clamp-3">
+                      <p className="text-xs text-zinc-600 line-clamp-3">
                         {bookData.description}
                       </p>
                     )}
@@ -234,14 +234,14 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                       <button
                         onClick={reset}
                         disabled={isUploading}
-                        className="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-medium hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-50"
+                        className="px-3 py-1.5 rounded-lg border border-zinc-700/60 text-zinc-300 text-xs font-medium hover:bg-zinc-800/60 transition-colors cursor-pointer disabled:opacity-50"
                       >
                         Change
                       </button>
                       <button
                         onClick={handleUpload}
                         disabled={isUploading}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-red-600 to-rose-600 text-white text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-all cursor-pointer shadow-md shadow-red-950/50"
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gold-500 text-zinc-950 text-xs font-semibold disabled:opacity-50 hover:bg-gold-400 transition-all cursor-pointer"
                       >
                         {isUploading ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
@@ -258,16 +258,16 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                 {uploadProgress && isUploading && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-400">
+                      <span className="text-xs text-zinc-500">
                         {STAGE_LABELS[uploadProgress.stage]}
                       </span>
-                      <span className="text-xs font-mono text-red-400 font-semibold">
+                      <span className="text-xs font-mono text-gold-500 font-semibold">
                         {uploadProgress.percentage}%
                       </span>
                     </div>
-                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-zinc-800/80 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-red-600 to-rose-500 transition-all duration-500 ease-out rounded-full"
+                        className="h-full bg-gradient-to-r from-gold-500 to-gold-400 transition-all duration-500 ease-out rounded-full"
                         style={{ width: `${uploadProgress.percentage}%` }}
                       />
                     </div>
@@ -278,7 +278,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
 
             {/* Error */}
             {error && (
-              <div className="mt-4 p-3 rounded-xl bg-red-950/50 border border-red-900/60 text-sm text-red-300 flex items-start gap-2">
+              <div className="mt-4 p-3 rounded-lg bg-red-950/30 border border-red-900/40 text-sm text-red-400/80 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
                 <span>{error}</span>
               </div>
@@ -289,4 +289,3 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
     </>
   );
 }
-
