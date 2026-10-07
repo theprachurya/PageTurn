@@ -15,11 +15,26 @@ export interface StatsData {
   booksCompleted: number;
   currentStreak: number;
   longestStreak: number;
-  dailyStats: DailyStats[]; // Last 30 days
+  dailyStats: DailyStats[]; // Selected chart range
 }
 
-export async function getStats(): Promise<StatsData> {
+export type StatsRange = "30" | "90" | "year" | "all";
+
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateFromKey(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export async function getStats(range: StatsRange = "30"): Promise<StatsData> {
   const { supabase, user } = await requireUser();
+  const selectedRange: StatsRange = ["30", "90", "year", "all"].includes(range) ? range : "30";
 
   // 1. Fetch all reading sessions
   const { data: sessions } = await supabase
@@ -44,13 +59,9 @@ export async function getStats(): Promise<StatsData> {
     dailyStats: []
   };
 
-  if (!sessions || sessions.length === 0) {
-    return stats;
-  }
-
   // Aggregate by date
   const dateMap = new Map<string, DailyStats>();
-  for (const session of sessions) {
+  for (const session of sessions || []) {
     const date = session.session_date;
     stats.totalMinutes += session.duration_minutes || 0;
     stats.totalWords += session.words_read || 0;
@@ -110,15 +121,26 @@ export async function getStats(): Promise<StatsData> {
   stats.currentStreak = currentStreak;
   stats.longestStreak = longestStreak;
 
-  // Last 30 days of stats for the chart
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-  
-  for (let i = 0; i < 30; i++) {
-    const d = new Date(thirtyDaysAgo);
-    d.setDate(d.getDate() + i);
-    const dateStr = d.toISOString().split("T")[0];
-    stats.dailyStats.push(dateMap.get(dateStr) || { date: dateStr, minutes: 0, words: 0 });
+  // Build the selected chart range using local calendar dates. Avoid ISO conversion
+  // here because it can shift a user's day when their timezone is not UTC.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let startDate: Date | null = null;
+  if (selectedRange === "all") {
+    if (dates.length > 0) startDate = dateFromKey(dates[0]);
+  } else if (selectedRange === "year") {
+    startDate = new Date(today.getFullYear(), 0, 1);
+  } else {
+    startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - (Number(selectedRange) - 1));
+  }
+
+  if (startDate) {
+    for (const day = new Date(startDate); day <= today; day.setDate(day.getDate() + 1)) {
+      const date = dateKey(day);
+      stats.dailyStats.push(dateMap.get(date) || { date, minutes: 0, words: 0 });
+    }
   }
 
   return stats;

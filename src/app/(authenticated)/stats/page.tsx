@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getStats, type StatsData } from "@/app/actions/stats.actions";
+import { getStats, type StatsData, type StatsRange } from "@/app/actions/stats.actions";
 import { 
   BarChart, 
   Bar, 
@@ -19,20 +19,24 @@ import { cn } from "@/lib/utils";
 export default function StatsPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<StatsRange>("30");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadStats() {
       try {
-        const data = await getStats();
-        setStats(data);
+        const data = await getStats(range);
+        if (!cancelled) setStats(data);
       } catch (err) {
         console.error("Failed to load stats", err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadStats();
-  }, []);
+    return () => { cancelled = true; };
+  }, [range]);
 
   if (loading) {
     return (
@@ -46,8 +50,22 @@ export default function StatsPage() {
   if (!stats) return null;
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const d = new Date(year, month - 1, day);
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const rangeLabels: Record<StatsRange, string> = {
+    "30": "Last 30 Days",
+    "90": "Last 90 Days",
+    year: "This Year",
+    all: "All Time",
+  };
+  const emptyDataMessage: Record<StatsRange, string> = {
+    "30": "No reading data in the last 30 days yet.",
+    "90": "No reading data in the last 90 days yet.",
+    year: "No reading data this year yet.",
+    all: "No reading data yet.",
   };
 
   const chartData = stats.dailyStats.map(d => ({
@@ -71,10 +89,10 @@ export default function StatsPage() {
         {/* Date Range Picker */}
         <div className="flex items-center gap-3 bg-[#111113] border border-[#1f1f23] rounded-lg px-4 py-2">
           <CalendarDays className="w-4 h-4 text-zinc-500" />
-          <select className="bg-transparent border-none text-zinc-300 text-sm font-medium focus:ring-0 focus:outline-none cursor-pointer pr-4">
+          <select aria-label="Chart date range" value={range} onChange={(event) => setRange(event.target.value as StatsRange)} className="bg-transparent border-none text-zinc-300 text-sm font-medium focus:ring-0 focus:outline-none cursor-pointer pr-4">
             <option className="bg-zinc-900" value="30">Last 30 Days</option>
             <option className="bg-zinc-900" value="90">Last 90 Days</option>
-            <option className="bg-zinc-900" value="365">This Year</option>
+            <option className="bg-zinc-900" value="year">This Year</option>
             <option className="bg-zinc-900" value="all">All Time</option>
           </select>
         </div>
@@ -151,7 +169,7 @@ export default function StatsPage() {
           <div className="flex justify-between items-center mb-8">
             <div>
               <h3 className="text-lg font-semibold text-zinc-100">Reading Time</h3>
-              <p className="text-xs text-zinc-600 mt-0.5">Minutes per day (Last 30 Days)</p>
+              <p className="text-xs text-zinc-600 mt-0.5">Minutes per day ({rangeLabels[range]})</p>
             </div>
             <div className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-600">
               <span>Less</span>
@@ -196,7 +214,7 @@ export default function StatsPage() {
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-zinc-600">
                 <Activity className="w-10 h-10 mb-3 opacity-20" />
-                <p className="text-sm">No reading data for the last 30 days yet.</p>
+                <p className="text-sm">{emptyDataMessage[range]}</p>
               </div>
             )}
           </div>
@@ -207,7 +225,7 @@ export default function StatsPage() {
           <div className="flex justify-between items-center mb-8">
             <div>
               <h3 className="text-lg font-semibold text-zinc-100">Words Read</h3>
-              <p className="text-xs text-zinc-600 mt-0.5">Volume per day (Last 30 Days)</p>
+              <p className="text-xs text-zinc-600 mt-0.5">Volume per day ({rangeLabels[range]})</p>
             </div>
             <div className="p-2 bg-zinc-800/30 rounded-lg border border-zinc-800/40">
               <Activity className="w-4 h-4 text-gold-500" />
@@ -250,7 +268,7 @@ export default function StatsPage() {
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-zinc-600">
                 <Activity className="w-10 h-10 mb-3 opacity-20" />
-                <p className="text-sm">No reading data for the last 30 days yet.</p>
+                <p className="text-sm">{emptyDataMessage[range]}</p>
               </div>
             )}
           </div>
