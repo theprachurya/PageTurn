@@ -124,81 +124,135 @@ export async function uploadBookToSupabase(
   const uniqueId = crypto.randomUUID();
   const epubFilePath = `${userId}/${uniqueId}.epub`;
   const coverFilePath = coverBlob ? `${userId}/${uniqueId}-cover.jpg` : null;
+  let epubUploaded = false;
+  let coverUploaded = false;
+  let insertedBookId: string | null = null;
 
-  // Stage: Upload EPUB (50% of total progress)
-  onProgress?.({ stage: "uploading_epub", percentage: 10 });
+  try {
+    // Stage: Upload EPUB (50% of total progress)
+    onProgress?.({ stage: "uploading_epub", percentage: 10 });
 
-  const { data: epubData } = await retryWithBackoff(async () => {
-    const result = await supabase.storage
-      .from("epubs")
-      .upload(epubFilePath, originalFile, {
-        cacheControl: "3600",
-        upsert: false,
-      });
-
-    if (result.error) throw new Error(`EPUB Upload failed: ${result.error.message}`);
-    return result;
-  });
-
-  onProgress?.({ stage: "uploading_epub", percentage: 50 });
-
-  // Stage: Upload Cover (30% of total progress)
-  let finalCoverUrl: string | null = null;
-
-  if (coverBlob && coverFilePath) {
-    onProgress?.({ stage: "uploading_cover", percentage: 55 });
-
-    // Compress cover before upload
-    const compressedCover = await compressCover(coverBlob);
-
-    await retryWithBackoff(async () => {
-      const { error: coverError } = await supabase.storage
-        .from("covers")
-        .upload(coverFilePath, compressedCover, {
-          contentType: "image/jpeg",
-          upsert: false,
+    const { data: epubData } = await retryWithBackoff(async () => {
+      const result = await supabase.storage
+        .from("epubs")
+        .upload(epubFilePath, originalFile, {
+          cacheControl: "3600",
+          // The path contains a fresh UUID. Upsert makes a retry safe if the
+          // first upload reached Storage but its response was lost.
+          upsert: true,
         });
 
-      if (coverError) throw new Error(`Cover Upload failed: ${coverError.message}`);
+      if (result.error) throw new Error(`EPUB Upload failed: ${result.error.message}`);
+      return result;
+    });
+    epubUploaded = true;
+
+    onProgress?.({ stage: "uploading_epub", percentage: 50 });
+
+    // Stage: Upload Cover (30% of total progress)
+    let finalCoverUrl: string | null = null;
+
+    if (coverBlob && coverFilePath) {
+      onProgress?.({ stage: "uploading_cover", percentage: 55 });
+
+      // Compress cover before upload
+      const compressedCover = await compressCover(coverBlob);
+
+      await retryWithBackoff(async () => {
+        const { error: coverError } = await supabase.storage
+          .from("covers")
+          .upload(coverFilePath, compressedCover, {
+            contentType: "image/jpeg",
+            upsert: true,
+          });
+
+        if (coverError) throw new Error(`Cover Upload failed: ${coverError.message}`);
+      });
+      coverUploaded = true;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("covers")
+        .getPublicUrl(coverFilePath);
+
+      finalCoverUrl = publicUrlData.publicUrl;
+    }
+
+    onProgress?.({ stage: "saving_metadata", percentage: 80 });
+
+    const { data: bookRecord, error: dbError } = await supabase
+      .from("books")
+      .insert({
+        user_id: userId,
+        title,
+        author,
+        description,
+        cover_url: finalCoverUrl,
+        epub_path: epubData.path,
+      })
+      .select()
+      .single();
+
+    if (dbError) throw new Error(`Database insert failed: ${dbError.message}`);
+    insertedBookId = bookRecord.id;
+
+    // Do not report success until the library association also exists. The
+    // reader queries user_books, so ignoring this error made uploaded books
+    // disappear from the user's library.
+    const { error: associationError } = await supabase.from("user_books").insert({
+      user_id: userId,
+      book_id: bookRecord.id,
+      status: "reading",
     });
 
-    const { data: publicUrlData } = supabase.storage
-      .from("covers")
-      .getPublicUrl(coverFilePath);
+    if (associationError) {
+      throw new Error(`Failed to add book to your library: ${associationError.message}`);
+    }
 
-    finalCoverUrl = publicUrlData.publicUrl;
+    onProgress?.({ stage: "done", percentage: 100 });
+    return bookRecord as BookRecord;
+  } catch (error) {
+    // Storage and Postgres do not share a transaction. Compensate for partial
+    // success so a failed upload does not leave inaccessible rows or files.
+    let cleanupFailed = false;
+
+    if (insertedBookId) {
+      try {
+        const { error: associationCleanupError } = await supabase
+          .from("user_books")
+          .delete()
+          .eq("user_id", userId)
+          .eq("book_id", insertedBookId);
+        cleanupFailed ||= Boolean(associationCleanupError);
+      } catch {
+        cleanupFailed = true;
+      }
+
+      try {
+        const { error: bookCleanupError } = await supabase
+          .from("books")
+          .delete()
+          .eq("user_id", userId)
+          .eq("id", insertedBookId);
+        cleanupFailed ||= Boolean(bookCleanupError);
+      } catch {
+        cleanupFailed = true;
+      }
+    }
+
+    const storageCleanup = await Promise.allSettled([
+      ...(coverUploaded && coverFilePath
+        ? [supabase.storage.from("covers").remove([coverFilePath])]
+        : []),
+      ...(epubUploaded ? [supabase.storage.from("epubs").remove([epubFilePath])] : []),
+    ]);
+    cleanupFailed ||= storageCleanup.some(
+      (result) => result.status === "rejected" || Boolean(result.value.error),
+    );
+
+    if (cleanupFailed) {
+      console.warn("[PageTurn] Upload rollback was incomplete.");
+    }
+
+    throw error;
   }
-
-  onProgress?.({ stage: "saving_metadata", percentage: 80 });
-
-  // Stage: Insert metadata (20% of total progress)
-  // TODO: If this insert fails, the EPUB and cover files uploaded above become
-  // orphaned in Supabase Storage. Consider a cleanup cron or wrapping the
-  // entire upload in a transaction-like pattern that deletes uploaded files on failure.
-  const { data: bookRecord, error: dbError } = await supabase
-    .from("books")
-    .insert({
-      user_id: userId,
-      title,
-      author,
-      description,
-      cover_url: finalCoverUrl,
-      epub_path: epubData!.path,
-    })
-    .select()
-    .single();
-
-  if (dbError)
-    throw new Error(`Database insert failed: ${dbError.message}`);
-
-  // Auto-create user_books record
-  await supabase.from("user_books").insert({
-    user_id: userId,
-    book_id: bookRecord.id,
-    status: "reading",
-  });
-
-  onProgress?.({ stage: "done", percentage: 100 });
-
-  return bookRecord as BookRecord;
 }
