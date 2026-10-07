@@ -39,9 +39,6 @@ This document serves as a comprehensive overview of the project's architecture, 
    - EPUB files are cached in IndexedDB via `localforage` for instantaneous offline access.
    - `OfflineQueue`: Actions performed while offline (updating progress, adding highlights) are queued and synced to Supabase when the connection is restored.
    - **Cross-device Realtime Sync**: Uses Supabase Realtime channels to broadcast reading progress (CFI) so users can resume reading seamlessly on another device.
-6. **AI Tools**
-   - *AI Recap*: A feature to summarize the story up to the user's current reading position (Note: currently uses a mocked API response).
-
 ---
 
 ## 📂 Project Architecture
@@ -52,7 +49,7 @@ This document serves as a comprehensive overview of the project's architecture, 
 │   ├── app/                    # Next.js App Router (Pages & API)
 │   │   ├── (authenticated)/    # Protected routes: /library, /read, /shelf, /stats, /history, /settings
 │   │   ├── actions/            # Server Actions (reader, library, stats)
-│   │   ├── api/                # API Routes (e.g., /api/recap)
+│   │   ├── api/                # API routes
 │   │   ├── dev-login/          # Local dev helper for quick sign-in
 │   │   └── dev-reader/         # Local dev helper for testing EPUB rendering
 │   │
@@ -60,7 +57,7 @@ This document serves as a comprehensive overview of the project's architecture, 
 │   │   ├── books/              # Book cards, progress rings
 │   │   ├── history/            # Heatmaps, activity logs
 │   │   ├── layout/             # App shell, sidebar, bottom navigation
-│   │   ├── library/            # AI recap dialog, tags/shelves managers
+│   │   ├── library/            # Tags/shelves managers
 │   │   ├── reader/             # Core EPUB reader, toolbars, popovers (highlights/dictionary)
 │   │   └── upload/             # Book uploader and parsing logic
 │   │
@@ -133,7 +130,6 @@ Open [http://localhost:3000](http://localhost:3000).
 ---
 
 ## ⚠️ Known Limitations & Mocks
-- **AI Recap Feature**: The `/api/recap` endpoint is currently mocked via a timeout and returns a static string. To make it functional, it needs to be integrated with an LLM (like Claude or OpenAI) and provided with the extracted text from the EPUB.
 - **EPUB Parsing**: Highly complex or severely malformed EPUB files might occasionally fail to render perfectly via `epub.js`, especially if they rely on non-standard DRM or heavily embedded custom scripts. DRM detection exists but is basic.
 
 ---

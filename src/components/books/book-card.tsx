@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, MoreVertical, Trash2, CheckCircle, Book, Clock, Folder, Sparkles, Pencil } from "lucide-react";
+import { BookOpen, MoreVertical, Trash2, CheckCircle, Book, Clock, Folder, Pencil } from "lucide-react";
 import { ProgressRing } from "./progress-ring";
 import { cn } from "@/lib/utils";
 import type { BookStatus } from "@/app/actions/library.actions";
@@ -40,7 +40,6 @@ interface BookCardProps {
   onUpdateStatus?: (bookId: string, status: BookStatus) => void;
   onEditMetadata?: (bookId: string) => void;
   onManageTags?: (bookId: string) => void;
-  onAIRecap?: (book: BookData) => void;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
@@ -49,7 +48,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }>
   completed: { label: "Completed", icon: CheckCircle, color: "text-emerald-400 bg-emerald-950/50 border-emerald-800/30" },
 };
 
-export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onEditMetadata, onManageTags, onAIRecap }: BookCardProps) {
+export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onEditMetadata, onManageTags }: BookCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const toggleMenu = (e: React.MouseEvent) => {
@@ -86,13 +85,6 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onE
     onManageTags?.(book.book_id);
   };
 
-  const handleAIRecap = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setMenuOpen(false);
-    onAIRecap?.(book);
-  };
-
   const closeMenu = () => setMenuOpen(false);
 
   const statusConfig = STATUS_CONFIG[book.status] || STATUS_CONFIG.reading;
@@ -106,7 +98,6 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onE
       <button onClick={(e) => handleStatusChange(e, "completed")} className="w-full text-left px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 transition-colors cursor-pointer flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Completed</button>
       <div className="h-px bg-zinc-800/60 my-1" />
       <button onClick={handleEditMetadata} className="w-full text-left px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 transition-colors cursor-pointer flex items-center gap-2"><Pencil className="w-3.5 h-3.5 text-zinc-500" /> Edit Metadata</button>
-      <button onClick={handleAIRecap} className="w-full text-left px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 transition-colors cursor-pointer flex items-center gap-2"><Sparkles className="w-3.5 h-3.5 text-gold-400" /> AI Recap</button>
       <button onClick={handleManageTags} className="w-full text-left px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 transition-colors cursor-pointer flex items-center gap-2"><Folder className="w-3.5 h-3.5 text-zinc-500" /> Organize...</button>
       <button onClick={handleDelete} className="w-full text-left px-3 py-1.5 text-xs text-red-400/80 hover:bg-red-950/30 transition-colors cursor-pointer flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Remove</button>
     </div>
