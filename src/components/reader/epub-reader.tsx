@@ -501,6 +501,22 @@ export function EpubReader({
     }
   };
 
+  const handleDeleteBookmark = async (bookmarkId: string) => {
+    const bookmark = bookmarks.find((item) => item.id === bookmarkId);
+    if (!bookmark) return;
+
+    setBookmarks((current) => current.filter((item) => item.id !== bookmarkId));
+
+    try {
+      await removeBookmarkAction(bookmarkId);
+    } catch (err) {
+      console.error("Failed to delete bookmark:", err);
+      setBookmarks((current) =>
+        current.some((item) => item.id === bookmarkId) ? current : [bookmark, ...current],
+      );
+    }
+  };
+
   const handleSaveHighlight = async (color: HighlightColor, note?: string) => {
     if (!selection) return;
 
@@ -718,6 +734,7 @@ export function EpubReader({
         onNextChapter={goNextChapter}
         onPrevChapter={goPrevChapter}
         onToggleBookmark={handleToggleBookmark}
+        onDeleteBookmark={handleDeleteBookmark}
         onToggleTTS={handleToggleTTS}
         isReadingAloud={isReadingAloud}
         onSearch={handleSearch}

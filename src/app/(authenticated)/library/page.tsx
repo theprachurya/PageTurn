@@ -8,7 +8,6 @@ import { BookUploader } from "@/components/upload/book-uploader";
 import { ShelvesSidebar } from "@/components/library/shelves-sidebar";
 import { ManageCollectionsDialog } from "@/components/library/manage-collections-dialog";
 import { EditBookMetadataDialog } from "@/components/library/edit-book-metadata-dialog";
-import { AIRecapDialog } from "@/components/library/ai-recap-dialog";
 import { cn } from "@/lib/utils";
 import { updateReadingStatus, type BookStatus } from "@/app/actions/library.actions";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -27,7 +26,6 @@ export default function LibraryPage() {
   const [allUserTags, setAllUserTags] = useState<{ id: string; name: string }[]>([]);
   const [managingCollectionsForBook, setManagingCollectionsForBook] = useState<{ id: string; title: string; tags: BookTag[]; shelves: BookShelf[] } | null>(null);
   const [editingBook, setEditingBook] = useState<BookData | null>(null);
-  const [recapBook, setRecapBook] = useState<{ id: string; title: string; cfi?: string | null } | null>(null);
 
   const supabaseRef = useRef<SupabaseClient | null>(null);
   if (!supabaseRef.current && typeof window !== "undefined") supabaseRef.current = createClient();
@@ -106,7 +104,6 @@ export default function LibraryPage() {
     <BookCard key={book.id} book={book} variant={viewMode} onDelete={handleDelete} onUpdateStatus={handleUpdateStatus}
       onEditMetadata={(id) => { const selected = books.find(b => b.book_id === id); if (selected) setEditingBook(selected); }}
       onManageTags={(id) => { const selected = books.find(b => b.book_id === id); if (selected) setManagingCollectionsForBook({ id: selected.book_id, title: selected.title, tags: selected.tags || [], shelves: selected.shelves || [] }); }}
-      onAIRecap={(book) => setRecapBook({ id: book.book_id, title: book.title, cfi: book.current_cfi })}
     />
   );
 
@@ -136,7 +133,6 @@ export default function LibraryPage() {
 
         {managingCollectionsForBook && <ManageCollectionsDialog bookId={managingCollectionsForBook.id} bookTitle={managingCollectionsForBook.title} initialTags={managingCollectionsForBook.tags} initialShelves={managingCollectionsForBook.shelves} onClose={() => setManagingCollectionsForBook(null)} onUpdate={fetchLibraryData} />}
         {editingBook && <EditBookMetadataDialog bookId={editingBook.book_id} initialMetadata={{ title: editingBook.title, author: editingBook.author || "", description: editingBook.description || "", cover_url: editingBook.cover_url || "" }} onClose={() => setEditingBook(null)} onSaved={(metadata) => handleMetadataSaved(editingBook.book_id, metadata)} />}
-        {recapBook && <AIRecapDialog bookId={recapBook.id} bookTitle={recapBook.title} currentCfi={recapBook.cfi} onClose={() => setRecapBook(null)} />}
       </main>
     </div>
   );

@@ -20,7 +20,8 @@ import {
   List,
   MessageSquare,
   Volume2,
-  Square
+  Square,
+  Trash2,
 } from "lucide-react";
 import type { ReaderSettings } from "@/lib/reader-settings";
 import { cn } from "@/lib/utils";
@@ -64,6 +65,7 @@ interface ReaderToolbarProps {
   onNextChapter?: () => void;
   onPrevChapter?: () => void;
   onToggleBookmark: () => void;
+  onDeleteBookmark: (bookmarkId: string) => void;
   onToggleTTS: () => void;
   isReadingAloud: boolean;
   onSearch?: (query: string) => void;
@@ -88,6 +90,7 @@ export function ReaderToolbar({
   onNextChapter,
   onPrevChapter,
   onToggleBookmark,
+  onDeleteBookmark,
   onToggleTTS,
   isReadingAloud,
   onSearch,
@@ -232,18 +235,32 @@ export function ReaderToolbar({
             {activeTab === "bookmarks" && (
               bookmarks.length > 0 ? (
                 bookmarks.map((bm) => (
-                  <button
+                  <div
                     key={bm.id}
-                    onClick={() => {
-                      onNavigate(bm.cfi);
-                      setShowSidebar(false);
-                      onClose();
-                    }}
-                    className="w-full text-left p-3 rounded-lg bg-zinc-900/40 hover:bg-zinc-800/50 border border-zinc-800/60 transition-colors text-sm cursor-pointer border-l-2 border-l-gold-500"
+                    className="group flex items-center gap-1 rounded-lg bg-zinc-900/40 border border-zinc-800/60 border-l-2 border-l-gold-500 pr-1 transition-colors hover:bg-zinc-800/50"
                   >
-                    <p className="font-medium text-zinc-200 truncate">{bm.label || "Bookmark"}</p>
-                    <p className="text-xs text-zinc-600 font-mono mt-1">{new Date(bm.created_at).toLocaleDateString()}</p>
-                  </button>
+                    <button
+                      onClick={() => {
+                        onNavigate(bm.cfi);
+                        setShowSidebar(false);
+                        onClose();
+                      }}
+                      className="min-w-0 flex-1 text-left p-3 text-sm cursor-pointer"
+                      aria-label={`Go to bookmark ${bm.label || "Bookmark"}`}
+                    >
+                      <p className="font-medium text-zinc-200 truncate">{bm.label || "Bookmark"}</p>
+                      <p className="text-xs text-zinc-600 font-mono mt-1">{new Date(bm.created_at).toLocaleDateString()}</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteBookmark(bm.id)}
+                      className="shrink-0 p-2 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60 transition-colors cursor-pointer"
+                      aria-label={`Delete bookmark ${bm.label || "Bookmark"}`}
+                      title="Delete bookmark"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 ))
               ) : (
                 <p className="text-zinc-600 text-sm text-center mt-10">No bookmarks yet</p>
