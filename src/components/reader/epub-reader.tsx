@@ -14,6 +14,8 @@ import {
   addBookmark as addBookmarkAction,
   removeBookmark as removeBookmarkAction,
 } from "@/app/actions/reader.actions";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ReaderToolbar, type NavItem, type BookmarkData } from "./reader-toolbar";
 import { DictionaryPopover } from "./dictionary-popover";
 import { HighlightPopover, type HighlightColor } from "./highlight-popover";
@@ -39,6 +41,8 @@ export function EpubReader({
   const totalWordsRef = useRef<number>(0);
   
   const [showToolbar, setShowToolbar] = useState(false);
+  const [distractionFree, setDistractionFree] = useState(false);
+  const [flipDirection, setFlipDirection] = useState<"next" | "prev" | null>(null);
   const [currentCfi, setCurrentCfi] = useState(initialCfi || "");
   const [progress, setProgress] = useState(initialProgress);
   const [chapterProgress, setChapterProgress] = useState(0);
@@ -48,6 +52,24 @@ export function EpubReader({
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
   const sessionWordsReadRef = useRef<number>(0);
   const wpmRef = useRef<number>(250); // Default average WPM
+
+  const turnPage = useCallback((dir: "next" | "prev") => {
+    if (!renditionRef.current) return;
+    setFlipDirection(dir);
+    if (dir === "next") {
+      renditionRef.current.next();
+    } else {
+      renditionRef.current.prev();
+    }
+    setTimeout(() => {
+      setFlipDirection(null);
+    }, 420);
+  }, []);
+
+  const turnPageRef = useRef(turnPage);
+  useEffect(() => {
+    turnPageRef.current = turnPage;
+  }, [turnPage]);
   
   // Phase 1 State
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
@@ -225,12 +247,12 @@ export function EpubReader({
     (rendition as unknown as { hooks: { content: { register: (fn: (contents: { document: Document }) => void) => void } } }).hooks.content.register((contents: { document: Document }) => {
       const style = contents.document.createElement("style");
       style.innerHTML = `
-        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(239, 68, 68, 0.4); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(239, 68, 68, 0.8); }
-        ::selection { background: rgba(239, 68, 68, 0.3); }
-        .epub-highlight { fill-opacity: 0.3 !important; mix-blend-mode: multiply; }
+        ::-webkit-scrollbar-thumb { background: rgba(215, 243, 106, 0.3); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(215, 243, 106, 0.6); }
+        ::selection { background: rgba(215, 243, 106, 0.35); }
+        .epub-highlight { fill-opacity: 0.35 !important; mix-blend-mode: multiply; }
       `;
       contents.document.head.appendChild(style);
     });
@@ -400,8 +422,18 @@ export function EpubReader({
     });
 
     const keyupHandler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") rendition.prev();
-      if (e.key === "ArrowRight") rendition.next();
+      const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+      if (activeTag === "input" || activeTag === "textarea") return;
+
+      if (e.key === "ArrowLeft") turnPageRef.current("prev");
+      if (e.key === "ArrowRight") turnPageRef.current("next");
+      if (e.key === "f" || e.key === "F") {
+        setDistractionFree((prev) => !prev);
+      }
+      if (e.key === "Escape") {
+        setDistractionFree(false);
+        setShowToolbar(false);
+      }
     };
 
     rendition.on("keyup", ((...args: unknown[]) => {
@@ -688,19 +720,37 @@ export function EpubReader({
     };
   }, []);
 
-  const bgColors = { light: "bg-white", dark: "bg-[#0f0f12]", sepia: "bg-[#f4ecd8]" };
-  const isBookmarked = bookmarks.some(b => b.cfi === currentCfi);
+  const bgColors = {
+    light: "bg-[#f5f2eb]",
+    dark: "bg-[#101317]",
+    sepia: "bg-[#ede8db]",
+  };
+  const isBookmarked = bookmarks.some((b) => b.cfi === currentCfi);
 
   return (
-    <div className={`fixed inset-0 ${bgColors[settings.theme]} flex flex-col`}>
-      
+    <div className={`fixed inset-0 ${bgColors[settings.theme]} flex flex-col select-none md:select-auto`}>
       {/* Real-time Sync Prompt */}
       {syncPrompt && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-in slide-in-from-top-5">
-          <span className="text-sm">Synced to a newer position on another device.</span>
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-[#1b241e] text-zinc-100 border border-[#d7f36a]/40 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-5">
+          <span className="text-xs font-mono">Synced to newer position on remote device.</span>
           <div className="flex gap-2">
-            <button onClick={() => { navigateTo(syncPrompt.cfi); setSyncPrompt(null); }} className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors cursor-pointer">Jump</button>
-            <button onClick={() => setSyncPrompt(null)} className="px-3 py-1 hover:bg-white/10 rounded text-sm transition-colors cursor-pointer">Dismiss</button>
+            <button
+              type="button"
+              onClick={() => {
+                navigateTo(syncPrompt.cfi);
+                setSyncPrompt(null);
+              }}
+              className="px-3 py-1 bg-[#d7f36a] text-[#17201b] font-mono text-xs font-bold rounded-lg transition-colors cursor-pointer"
+            >
+              Jump
+            </button>
+            <button
+              type="button"
+              onClick={() => setSyncPrompt(null)}
+              className="px-3 py-1 hover:bg-[#202a23] text-zinc-400 font-mono text-xs rounded-lg transition-colors cursor-pointer"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}
@@ -720,8 +770,11 @@ export function EpubReader({
           x={activeHighlightPos.x}
           y={activeHighlightPos.y}
           isExisting={true}
-          initialColor={highlights.find(h => h.id === activeHighlightId)?.color as HighlightColor || "yellow"}
-          initialNote={highlights.find(h => h.id === activeHighlightId)?.note || ""}
+          initialColor={
+            (highlights.find((h) => h.id === activeHighlightId)?.color as HighlightColor) ||
+            "yellow"
+          }
+          initialNote={highlights.find((h) => h.id === activeHighlightId)?.note || ""}
           onSave={handleUpdateExistingHighlight}
           onDelete={handleDeleteHighlight}
           onClose={() => setActiveHighlightId(null)}
@@ -737,8 +790,49 @@ export function EpubReader({
         />
       )}
 
+      {/* Distraction Free / Zen Floating Badge */}
+      {distractionFree && (
+        <aside
+          aria-label="Zen mode status"
+          className="fixed top-4 right-4 z-40 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#17201b]/90 backdrop-blur-md border border-[#344137] text-[11px] font-mono text-zinc-300 opacity-60 hover:opacity-100 transition-opacity"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#d7f36a] animate-pulse" />
+          Zen Mode (Press F or Esc)
+          <button
+            type="button"
+            onClick={() => setDistractionFree(false)}
+            className="ml-1 p-0.5 hover:text-white cursor-pointer"
+            aria-label="Exit Zen mode"
+          >
+            ✕
+          </button>
+        </aside>
+      )}
+
+      {/* Desktop Quick Side Arrow Buttons */}
+      <button
+        type="button"
+        onClick={() => turnPage("prev")}
+        className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-[#17201b]/70 backdrop-blur-md border border-[#344137] text-zinc-400 hover:text-[#d7f36a] hover:bg-[#202a23] items-center justify-center opacity-25 hover:opacity-100 transition-all cursor-pointer shadow-lg hover:scale-105"
+        title="Previous Page (←)"
+        aria-label="Previous Page"
+      >
+        <ArrowLeft className="w-4 h-4" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => turnPage("next")}
+        className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-[#17201b]/70 backdrop-blur-md border border-[#344137] text-zinc-400 hover:text-[#d7f36a] hover:bg-[#202a23] items-center justify-center opacity-25 hover:opacity-100 transition-all cursor-pointer shadow-lg hover:scale-105"
+        title="Next Page (→)"
+        aria-label="Next Page"
+      >
+        <ArrowRight className="w-4 h-4" />
+      </button>
+
+      {/* Reader Floating Instrument Toolbar */}
       <ReaderToolbar
-        visible={showToolbar}
+        visible={showToolbar && !distractionFree}
         chapter={chapter || "Unknown Chapter"}
         progress={progress}
         chapterProgress={chapterProgress}
@@ -747,6 +841,8 @@ export function EpubReader({
         highlights={highlights}
         estimatedTimeRemaining={estimatedTimeRemaining}
         settings={settings}
+        distractionFree={distractionFree}
+        onToggleDistractionFree={() => setDistractionFree(!distractionFree)}
         onSettingsChange={updateSettings}
         isBookmarked={isBookmarked}
         onNavigate={navigateTo}
@@ -762,20 +858,44 @@ export function EpubReader({
         onClose={() => setShowToolbar(false)}
       />
 
-      <div className="flex-1 overflow-hidden flex justify-center w-full">
+      {/* Centered Physical Document Canvas */}
+      <div className="reader-canvas-wrapper flex-1 overflow-hidden flex justify-center items-center w-full px-2 sm:px-6 py-2 sm:py-5">
         <div
-          ref={viewerRef}
-          onClick={handleCenterTap}
-          className="w-full max-w-3xl h-full shadow-sm"
-        />
+          data-reader-theme={settings.theme}
+          className={cn(
+            "reader-book-canvas relative w-full max-w-4xl h-full flex flex-col overflow-hidden",
+            flipDirection === "next" && "page-turn-anim-next",
+            flipDirection === "prev" && "page-turn-anim-prev"
+          )}
+        >
+          {/* Central Spine Crease Shadow */}
+          <div className="reader-spine-crease pointer-events-none" />
+
+          {/* Realistic Paper Page Deckle Edge */}
+          <div className="reader-page-edge pointer-events-none" />
+
+          {/* 3D Paper Curl Shadow Sweep on Turn */}
+          {flipDirection === "next" && <div className="paper-shadow-sweep-next" />}
+          {flipDirection === "prev" && <div className="paper-shadow-sweep-prev" />}
+
+          {/* EPUB Viewer Surface */}
+          <div
+            ref={viewerRef}
+            onClick={handleCenterTap}
+            className="w-full h-full flex-1"
+          />
+        </div>
       </div>
 
-      <div className={`h-1 ${settings.theme === "dark" ? "bg-zinc-900" : "bg-gray-200"}`}>
-        <div
-          className="h-full bg-gradient-to-r from-red-600 to-rose-600 transition-all duration-300"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+      {/* Ambient Reading Progress Bar */}
+      {!distractionFree && (
+        <div className={`h-1 ${settings.theme === "dark" ? "bg-[#121a15]" : "bg-zinc-300/60"}`}>
+          <div
+            className="h-full bg-gradient-to-r from-[#d7f36a] to-[#bfdc51] shadow-[0_0_8px_rgba(215,243,106,0.35)] transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }

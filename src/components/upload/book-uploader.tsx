@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Upload, X, BookOpen, Loader2, AlertTriangle } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Upload, X, BookOpen, Loader2, AlertTriangle, ShieldCheck, FileText } from "lucide-react";
 import { extractEpubMetadata, type ExtractedBookData } from "@/lib/epub-utils";
 import {
   uploadBookToSupabase,
@@ -11,22 +11,31 @@ import {
   type UploadStage,
 } from "@/lib/upload-book";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 interface BookUploaderProps {
   onUploadComplete?: () => void;
+  isOpenExternally?: boolean;
+  onCloseExternal?: () => void;
 }
 
 const STAGE_LABELS: Record<UploadStage, string> = {
-  validating: "Validating file...",
-  uploading_epub: "Uploading EPUB...",
-  uploading_cover: "Uploading cover...",
-  saving_metadata: "Saving metadata...",
-  done: "Done!",
+  validating: "Validating EPUB integrity...",
+  uploading_epub: "Encrypting & streaming document...",
+  uploading_cover: "Extracting & optimizing cover art...",
+  saving_metadata: "Syncing library metadata...",
+  done: "Import Complete!",
 };
 
-export function BookUploader({ onUploadComplete }: BookUploaderProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function BookUploader({
+  onUploadComplete,
+  isOpenExternally,
+  onCloseExternal,
+}: BookUploaderProps) {
+  const [isOpenInternal, setIsOpenInternal] = useState(false);
+  const isModalOpen = isOpenExternally !== undefined ? isOpenExternally : isOpenInternal;
+
   const [isDragging, setIsDragging] = useState(false);
   const [bookData, setBookData] = useState<ExtractedBookData | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -51,7 +60,11 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
 
   const handleClose = () => {
     reset();
-    setIsOpen(false);
+    if (onCloseExternal) {
+      onCloseExternal();
+    } else {
+      setIsOpenInternal(false);
+    }
   };
 
   const handleFile = async (file: File) => {
@@ -60,6 +73,7 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
     const validationError = validateEpubFile(file);
     if (validationError) {
       setError(validationError);
+      toast.error(validationError, "Invalid Document");
       return;
     }
 
@@ -67,7 +81,9 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
     try {
       const isDrm = await checkForDrm(file);
       if (isDrm) {
-        setError("This EPUB file appears to be DRM-protected. PageTurn cannot open DRM-protected books.");
+        const msg = "This EPUB file appears to be DRM-protected. PageTurn cannot open DRM-protected books.";
+        setError(msg);
+        toast.error(msg, "DRM Protected");
         setIsExtracting(false);
         return;
       }
@@ -87,7 +103,9 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
         setCoverPreview(previewUrl);
       }
     } catch {
-      setError("Could not read this EPUB file. It may be corrupted.");
+      const msg = "Could not parse EPUB structure. The file may be damaged.";
+      setError(msg);
+      toast.error(msg, "Extraction Error");
     } finally {
       setIsExtracting(false);
     }
@@ -110,7 +128,6 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
 
     setIsUploading(true);
     setError(null);
-    setUploadProgress({ stage: "validating", percentage: 0 });
 
     try {
       const supabase = createClient();
@@ -121,45 +138,71 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
       if (!user) throw new Error("Not authenticated");
 
       await uploadBookToSupabase(bookData, user.id, setUploadProgress);
-      
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      toast.success(`"${bookData.title}" has been added to your library.`, "Import Successful");
       handleClose();
       onUploadComplete?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      const msg = err instanceof Error ? err.message : "Upload failed. Please try again.";
+      setError(msg);
+      toast.error(msg, "Upload Failed");
     } finally {
       setIsUploading(false);
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (coverPreview) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, [coverPreview]);
+
   return (
     <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gold-500 hover:bg-gold-400 text-zinc-950 font-semibold text-sm transition-all duration-200 cursor-pointer"
-      >
-        <Upload className="w-4 h-4" />
-        Upload Book
-      </button>
+      {/* Optional inline button trigger if not externally rendered */}
+      {isOpenExternally === undefined && (
+        <button
+          onClick={() => setIsOpenInternal(true)}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gold-500 hover:bg-gold-400 active:scale-95 text-zinc-950 font-semibold text-xs tracking-tight transition-all duration-200 cursor-pointer shadow-sm"
+        >
+          <Upload className="w-3.5 h-3.5" />
+          <span>Upload EPUB</span>
+        </button>
+      )}
 
-      {/* Modal Overlay */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Modal Dialog */}
+      {isModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="upload-modal-title"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
           <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-md animate-fade-in"
+            className="absolute inset-0"
             onClick={handleClose}
           />
 
-          <div className="relative bg-[#111113] border border-[#1f1f23] rounded-2xl shadow-2xl shadow-black/60 max-w-lg w-full p-6 animate-slide-up text-zinc-100 z-10">
+          <div className="relative bg-[#14171b] border border-white/10 rounded-2xl shadow-2xl shadow-black/80 max-w-lg w-full p-6 animate-in zoom-in-95 duration-150 text-zinc-100 z-10 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-zinc-100">Upload Book</h2>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[10px] text-gold-400 tracking-widest uppercase px-2 py-0.5 rounded bg-gold-500/10 border border-gold-500/20">
+                  DOC • IMPORT
+                </span>
+                <h2 id="upload-modal-title" className="text-base font-bold text-zinc-100">
+                  Add Document
+                </h2>
+              </div>
               <button
                 onClick={handleClose}
-                className="p-2 rounded-lg hover:bg-zinc-800/60 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+                aria-label="Close dialog"
+                className="p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
@@ -173,31 +216,50 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
                 className={cn(
-                  "border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300",
+                  "relative border-2 border-dashed rounded-xl p-10 text-center transition-all duration-300 overflow-hidden",
                   isDragging
-                    ? "border-gold-500/60 bg-gold-500/[0.04]"
-                    : "border-zinc-800/80 hover:border-gold-500/20 hover:bg-zinc-900/30"
+                    ? "border-gold-400 bg-gold-500/[0.06] scale-[1.01]"
+                    : "border-white/10 hover:border-gold-500/30 hover:bg-white/[0.02]"
                 )}
               >
+                {/* Background dot matrix */}
+                <div
+                  className="absolute inset-0 opacity-15 pointer-events-none"
+                  style={{
+                    backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)",
+                    backgroundSize: "16px 16px",
+                  }}
+                />
+
                 {isExtracting ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 text-gold-500 animate-spin" />
-                    <p className="text-sm text-gold-400/80">
-                      Checking file & extracting metadata...
-                    </p>
+                  <div className="relative z-10 flex flex-col items-center gap-3 py-4">
+                    <Loader2 className="w-8 h-8 text-gold-400 animate-spin" />
+                    <div>
+                      <p className="text-xs font-mono font-medium text-gold-400 tracking-wide uppercase">
+                        Extracting Metadata
+                      </p>
+                      <p className="text-[11px] text-zinc-500 mt-1">
+                        Parsing chapters, typography, and cover art...
+                      </p>
+                    </div>
                   </div>
                 ) : (
-                  <>
-                    <BookOpen className="w-10 h-10 text-zinc-700 mx-auto mb-4" />
-                    <p className="text-sm text-zinc-300 mb-1 font-medium">
-                      Drag & drop your .epub file here
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-300 mb-4 shadow-sm group-hover:text-gold-400">
+                      <FileText className="w-6 h-6 text-gold-400/90" />
+                    </div>
+                    <p className="text-sm text-zinc-100 font-semibold mb-1">
+                      Drag & drop your EPUB file here
                     </p>
-                    <p className="text-xs text-zinc-600 mb-4">Max 100 MB · No DRM</p>
+                    <p className="text-xs text-zinc-500 mb-5 font-mono">
+                      .epub format · Up to 100 MB · DRM-free
+                    </p>
                     <button
+                      type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2 rounded-lg bg-zinc-800/60 text-zinc-200 border border-zinc-700/60 text-sm font-medium hover:bg-zinc-700/60 hover:text-white transition-colors cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-zinc-100 text-xs font-medium border border-white/10 transition-all active:scale-95 cursor-pointer"
                     >
-                      Browse Files
+                      Browse Local Files
                     </button>
                     <input
                       ref={fileInputRef}
@@ -206,74 +268,87 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
                       onChange={handleFileSelect}
                       className="hidden"
                     />
-                  </>
+
+                    <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-center gap-4 text-[10px] font-mono text-zinc-500">
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Private Storage
+                      </span>
+                      <span>•</span>
+                      <span>Offline Cached</span>
+                    </div>
+                  </div>
                 )}
               </div>
             ) : (
               /* Preview */
               <div className="space-y-4">
-                <div className="flex gap-4">
-                  <div className="w-24 h-36 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800/60 flex-shrink-0">
+                <div className="flex gap-4 p-3.5 rounded-xl bg-white/[0.03] border border-white/10">
+                  <div className="w-20 h-28 rounded-lg overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 relative shadow-md">
                     {coverPreview ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={coverPreview}
                         alt="Cover preview"
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="w-8 h-8 text-zinc-700" />
+                      <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                        <BookOpen className="w-7 h-7" />
                       </div>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-zinc-100 truncate">
-                      {bookData.title}
-                    </h3>
-                    <p className="text-sm text-zinc-500 mb-1">{bookData.author}</p>
-                    {bookData.description && (
-                      <p className="text-xs text-zinc-600 line-clamp-3">
-                        {bookData.description}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-bold text-sm text-zinc-100 truncate">
+                        {bookData.title}
+                      </h3>
+                      <p className="text-xs text-zinc-400 truncate mt-0.5">
+                        {bookData.author || "Unknown Author"}
                       </p>
-                    )}
-                    <div className="flex gap-2 mt-4">
+                      {bookData.description && (
+                        <p className="text-[11px] text-zinc-500 line-clamp-2 mt-1.5 leading-relaxed">
+                          {bookData.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 mt-3">
                       <button
                         onClick={reset}
                         disabled={isUploading}
-                        className="px-3 py-1.5 rounded-lg border border-zinc-700/60 text-zinc-300 text-xs font-medium hover:bg-zinc-800/60 transition-colors cursor-pointer disabled:opacity-50"
+                        className="px-3 py-1.5 rounded-lg border border-white/10 text-zinc-400 hover:text-zinc-200 text-xs font-medium hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40"
                       >
                         Change
                       </button>
                       <button
                         onClick={handleUpload}
                         disabled={isUploading}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-gold-500 text-zinc-950 text-xs font-semibold disabled:opacity-50 hover:bg-gold-400 transition-all cursor-pointer"
+                        className="flex-1 flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-lg bg-gold-500 text-zinc-950 text-xs font-bold disabled:opacity-40 hover:bg-gold-400 transition-all active:scale-95 cursor-pointer shadow-sm"
                       >
                         {isUploading ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
-                          <Upload className="w-3 h-3" />
+                          <Upload className="w-3.5 h-3.5" />
                         )}
-                        {isUploading ? "Uploading..." : "Upload"}
+                        <span>{isUploading ? "Importing Document..." : "Import to Library"}</span>
                       </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Upload Progress Bar */}
+                {/* Progress Bar */}
                 {uploadProgress && isUploading && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-500">
+                  <div className="space-y-2 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-400 font-mono text-[11px]">
                         {STAGE_LABELS[uploadProgress.stage]}
                       </span>
-                      <span className="text-xs font-mono text-gold-500 font-semibold">
+                      <span className="font-mono text-gold-400 font-bold">
                         {uploadProgress.percentage}%
                       </span>
                     </div>
-                    <div className="h-1.5 bg-zinc-800/80 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-black/60 rounded-full overflow-hidden border border-white/5">
                       <div
-                        className="h-full bg-gradient-to-r from-gold-500 to-gold-400 transition-all duration-500 ease-out rounded-full"
+                        className="h-full bg-gold-400 transition-all duration-300 ease-out rounded-full shadow-[0_0_10px_rgba(216,255,62,0.5)]"
                         style={{ width: `${uploadProgress.percentage}%` }}
                       />
                     </div>
@@ -282,11 +357,11 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
               </div>
             )}
 
-            {/* Error */}
+            {/* Error Banner */}
             {error && (
-              <div className="mt-4 p-3 rounded-lg bg-red-950/30 border border-red-900/40 text-sm text-red-400/80 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
-                <span>{error}</span>
+              <div className="mt-4 p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-xs text-red-300 flex items-start gap-2 animate-in fade-in">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                <span className="leading-relaxed">{error}</span>
               </div>
             )}
           </div>
