@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { LayoutGrid, List, Filter, Library, Clock, Book, CheckCircle, Search, ArrowDownAZ } from "lucide-react";
 import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
@@ -54,18 +54,42 @@ export default function LibraryPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
 
-    const { data: ubData } = await supabase.from("user_books").select(`id, book_id, status, current_cfi, progress_percentage, last_read_at, books (id, title, author, description, cover_url)`).eq("user_id", user.id).order("last_read_at", { ascending: false });
-    const { data: tagsData } = await supabase.from("book_tags").select(`book_id, tags (id, name, color)`).eq("user_id", user.id);
-    const { data: userTagsData } = await supabase.from("tags").select("id, name").eq("user_id", user.id).order("name");
-    if (userTagsData) setAllUserTags(userTagsData);
-    const { data: shelvesData } = await supabase.from("shelf_books").select(`book_id, shelves (id, name)`).eq("user_id", user.id);
+    const [
+      { data: ubData },
+      { data: tagsData },
+      { data: userTagsData },
+      { data: shelvesData },
+    ] = await Promise.all([
+      supabase.from("user_books").select(`id, book_id, status, current_cfi, progress_percentage, last_read_at, books (id, title, author, description, cover_url)`).eq("user_id", user.id).order("last_read_at", { ascending: false }),
+      supabase.from("book_tags").select(`book_id, tags (id, name, color)`).eq("user_id", user.id),
+      supabase.from("tags").select("id, name").eq("user_id", user.id).order("name"),
+      supabase.from("shelf_books").select(`book_id, shelves (id, name)`).eq("user_id", user.id),
+    ]);
+
+    setAllUserTags(userTagsData || []);
 
     if (ubData) {
+      const tagsByBook = new Map<string, BookTag[]>();
+      for (const row of tagsData || []) {
+        const tag = row.tags as unknown as BookTag | null;
+        if (!tag) continue;
+        const bookTags = tagsByBook.get(row.book_id);
+        if (bookTags) bookTags.push(tag);
+        else tagsByBook.set(row.book_id, [tag]);
+      }
+
+      const shelvesByBook = new Map<string, BookShelf[]>();
+      for (const row of shelvesData || []) {
+        const shelf = row.shelves as unknown as BookShelf | null;
+        if (!shelf) continue;
+        const bookShelves = shelvesByBook.get(row.book_id);
+        if (bookShelves) bookShelves.push(shelf);
+        else shelvesByBook.set(row.book_id, [shelf]);
+      }
+
       setBooks((ubData as unknown as LibraryBookRow[]).map((ub) => {
         const book = ub.books;
-        const bookTags = tagsData?.filter(t => t.book_id === ub.book_id).map(t => t.tags).filter(Boolean) as unknown as BookTag[];
-        const bookShelves = shelvesData?.filter(s => s.book_id === ub.book_id).map(s => s.shelves).filter(Boolean) as unknown as BookShelf[];
-        return { id: ub.id, book_id: ub.book_id, title: book?.title || "Unknown", author: book?.author || null, description: book?.description || null, cover_url: book?.cover_url || null, progress_percentage: Number(ub.progress_percentage) || 0, current_cfi: ub.current_cfi || null, last_read_at: ub.last_read_at || null, status: ub.status || "reading", tags: bookTags, shelves: bookShelves };
+        return { id: ub.id, book_id: ub.book_id, title: book?.title || "Unknown", author: book?.author || null, description: book?.description || null, cover_url: book?.cover_url || null, progress_percentage: Number(ub.progress_percentage) || 0, current_cfi: ub.current_cfi || null, last_read_at: ub.last_read_at || null, status: ub.status || "reading", tags: tagsByBook.get(ub.book_id) || [], shelves: shelvesByBook.get(ub.book_id) || [] };
       }));
     }
     setLoading(false);
@@ -99,23 +123,36 @@ export default function LibraryPage() {
     setBooks(current => current.map(book => book.book_id === bookId ? { ...book, ...metadata, author: metadata.author || null, description: metadata.description || null, cover_url: metadata.cover_url || null } : book));
   };
 
-  let filteredBooks = books.filter(b => {
-    if (statusFilter !== "all" && b.status !== statusFilter) return false;
-    if (activeShelfId && !(b.shelves || []).some(s => s.id === activeShelfId)) return false;
-    if (activeTagId && !(b.tags || []).some(t => t.id === activeTagId)) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      if (!b.title.toLowerCase().includes(q) && !(b.author && b.author.toLowerCase().includes(q))) return false;
-    }
-    return true;
-  });
+  const filteredBooks = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    const recentAt = new Map(books.map(book => [
+      book.book_id,
+      book.last_read_at ? new Date(book.last_read_at).getTime() : 0,
+    ]));
 
-  filteredBooks = filteredBooks.sort((a, b) => {
-    if (sortBy === "title") return a.title.localeCompare(b.title);
-    if (sortBy === "progress") return b.progress_percentage - a.progress_percentage;
-    if (sortBy === "recent") return (b.last_read_at ? new Date(b.last_read_at).getTime() : 0) - (a.last_read_at ? new Date(a.last_read_at).getTime() : 0);
-    return 0;
-  });
+    return books.filter(book => {
+      if (statusFilter !== "all" && book.status !== statusFilter) return false;
+      if (activeShelfId && !book.shelves?.some(shelf => shelf.id === activeShelfId)) return false;
+      if (activeTagId && !book.tags?.some(tag => tag.id === activeTagId)) return false;
+      if (query && !book.title.toLowerCase().includes(query) && !(book.author && book.author.toLowerCase().includes(query))) return false;
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === "title") return a.title.localeCompare(b.title);
+      if (sortBy === "progress") return b.progress_percentage - a.progress_percentage;
+      if (sortBy === "recent") return (recentAt.get(b.book_id) || 0) - (recentAt.get(a.book_id) || 0);
+      return 0;
+    });
+  }, [books, statusFilter, activeShelfId, activeTagId, searchQuery, sortBy]);
+
+  const bookCounts = useMemo(() => {
+    const counts: Record<BookStatus, number> = { reading: 0, plan_to_read: 0, completed: 0 };
+    for (const book of books) {
+      if (book.status === "reading") counts.reading++;
+      else if (book.status === "plan_to_read") counts.plan_to_read++;
+      else if (book.status === "completed") counts.completed++;
+    }
+    return counts;
+  }, [books]);
 
   if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="w-7 h-7 border-2 border-zinc-800 border-t-gold-500 rounded-full animate-spin" /></div>;
 
@@ -131,9 +168,9 @@ export default function LibraryPage() {
       <aside className="w-full md:w-60 flex-shrink-0"><div className="sticky top-20 space-y-8">
         <div><p className="section-label mb-3 px-3">Library</p><div className="space-y-0.5">
           <button onClick={() => setStatusFilter("all")} className={cn("w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer", statusFilter === "all" ? "bg-gold-500/8 text-gold-400" : "text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300")}><Library className="w-4 h-4" /> All Books<span className="ml-auto text-xs opacity-50 font-mono">{books.length}</span></button>
-          <button onClick={() => setStatusFilter("reading")} className={cn("w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer", statusFilter === "reading" ? "bg-gold-500/8 text-gold-400" : "text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300")}><Book className="w-4 h-4" /> Reading<span className="ml-auto text-xs opacity-50 font-mono">{books.filter(b => b.status === "reading").length}</span></button>
-          <button onClick={() => setStatusFilter("plan_to_read")} className={cn("w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer", statusFilter === "plan_to_read" ? "bg-gold-500/8 text-gold-400" : "text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300")}><Clock className="w-4 h-4" /> Want to Read<span className="ml-auto text-xs opacity-50 font-mono">{books.filter(b => b.status === "plan_to_read").length}</span></button>
-          <button onClick={() => setStatusFilter("completed")} className={cn("w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer", statusFilter === "completed" ? "bg-gold-500/8 text-gold-400" : "text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300")}><CheckCircle className="w-4 h-4" /> Finished<span className="ml-auto text-xs opacity-50 font-mono">{books.filter(b => b.status === "completed").length}</span></button>
+          <button onClick={() => setStatusFilter("reading")} className={cn("w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer", statusFilter === "reading" ? "bg-gold-500/8 text-gold-400" : "text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300")}><Book className="w-4 h-4" /> Reading<span className="ml-auto text-xs opacity-50 font-mono">{bookCounts.reading}</span></button>
+          <button onClick={() => setStatusFilter("plan_to_read")} className={cn("w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer", statusFilter === "plan_to_read" ? "bg-gold-500/8 text-gold-400" : "text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300")}><Clock className="w-4 h-4" /> Want to Read<span className="ml-auto text-xs opacity-50 font-mono">{bookCounts.plan_to_read}</span></button>
+          <button onClick={() => setStatusFilter("completed")} className={cn("w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer", statusFilter === "completed" ? "bg-gold-500/8 text-gold-400" : "text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300")}><CheckCircle className="w-4 h-4" /> Finished<span className="ml-auto text-xs opacity-50 font-mono">{bookCounts.completed}</span></button>
         </div></div>
         <div><div className="flex items-center justify-between mb-3 px-3"><p className="section-label">Tags</p></div>{allUserTags.length > 0 ? <div className="flex flex-wrap gap-1.5 px-3">{allUserTags.map(tag => <button key={tag.id} onClick={() => setActiveTagId(activeTagId === tag.id ? null : tag.id)} className={cn("px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer", activeTagId === tag.id ? "bg-gold-500/12 text-gold-400 border border-gold-500/20" : "bg-zinc-900/60 text-zinc-500 hover:text-zinc-300 border border-zinc-800/60")}>{tag.name}</button>)}</div> : <p className="text-xs text-zinc-700 italic px-3">No tags yet</p>}</div>
         <ShelvesSidebar activeShelfId={activeShelfId} onSelectShelf={setActiveShelfId} />

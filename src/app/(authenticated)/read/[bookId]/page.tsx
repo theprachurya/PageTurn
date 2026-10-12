@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getCachedEpub, cacheEpub } from "@/lib/epub-cache";
@@ -18,17 +18,14 @@ export default function ReadPage() {
   const [loadingStatus, setLoadingStatus] = useState("Loading your book...");
   const [error, setError] = useState<string | null>(null);
   const supabaseRef = useRef<SupabaseClient | null>(null);
-  if (!supabaseRef.current && typeof window !== "undefined") {
-    supabaseRef.current = createClient();
-  }
-  const supabase = supabaseRef.current!;
+  const getSupabase = useCallback(() => {
+    if (supabaseRef.current === null) supabaseRef.current = createClient();
+    return supabaseRef.current;
+  }, []);
 
-  useEffect(() => {
-    loadBook();
-  }, [bookId]);
-
-  const loadBook = async () => {
+  const loadBook = useCallback(async () => {
     try {
+      const supabase = getSupabase();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -37,9 +34,22 @@ export default function ReadPage() {
         return;
       }
 
-      // 1. Try IndexedDB cache first
+      // Cache lookup and reading position are independent after authentication.
       setLoadingStatus("Checking local cache...");
-      const cached = await getCachedEpub(bookId);
+      const [cached, { data: userBook }] = await Promise.all([
+        getCachedEpub(bookId),
+        supabase
+          .from("user_books")
+          .select("current_cfi, progress_percentage")
+          .eq("user_id", user.id)
+          .eq("book_id", bookId)
+          .single(),
+      ]);
+
+      if (userBook) {
+        setInitialCfi(userBook.current_cfi);
+        setInitialProgress(Number(userBook.progress_percentage) || 0);
+      }
 
       let arrayBuffer: ArrayBuffer;
 
@@ -51,7 +61,7 @@ export default function ReadPage() {
         setLoadingStatus("Fetching book info...");
         const { data: book, error: bookError } = await supabase
           .from("books")
-          .select("*")
+          .select("epub_path")
           .eq("id", bookId)
           .eq("user_id", user.id)
           .single();
@@ -81,27 +91,19 @@ export default function ReadPage() {
         await cacheEpub(bookId, arrayBuffer);
       }
 
-      // 5. Fetch reading progress
-      setLoadingStatus("Restoring your position...");
-      const { data: userBook } = await supabase
-        .from("user_books")
-        .select("current_cfi, progress_percentage")
-        .eq("user_id", user.id)
-        .eq("book_id", bookId)
-        .single();
-
-      if (userBook) {
-        setInitialCfi(userBook.current_cfi);
-        setInitialProgress(Number(userBook.progress_percentage) || 0);
-      }
-
       setEpubUrl(arrayBuffer);
       setLoading(false);
     } catch {
       setError("Failed to load book");
       setLoading(false);
     }
-  };
+  }, [bookId, getSupabase, router]);
+
+  useEffect(() => {
+    // loadBook updates state after its initial asynchronous auth lookup.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadBook();
+  }, [loadBook]);
 
   if (loading) {
     return (
