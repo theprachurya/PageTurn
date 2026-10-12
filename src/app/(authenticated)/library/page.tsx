@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { LayoutGrid, List, Filter, Library, Clock, Book, CheckCircle, Search, ArrowDownAZ } from "lucide-react";
 import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
@@ -13,6 +13,22 @@ import { updateReadingStatus, type BookStatus } from "@/app/actions/library.acti
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type FilterStatus = "all" | BookStatus;
+type SortMode = "recent" | "title" | "progress";
+type LibraryBookRow = {
+  id: string;
+  book_id: string;
+  status: string | null;
+  current_cfi: string | null;
+  progress_percentage: number | string | null;
+  last_read_at: string | null;
+  books: {
+    id: string;
+    title: string | null;
+    author: string | null;
+    description: string | null;
+    cover_url: string | null;
+  } | null;
+};
 
 export default function LibraryPage() {
   const [books, setBooks] = useState<BookData[]>([]);
@@ -20,7 +36,7 @@ export default function LibraryPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"recent" | "title" | "progress" | "added">("recent");
+  const [sortBy, setSortBy] = useState<SortMode>("recent");
   const [activeShelfId, setActiveShelfId] = useState<string | null>(null);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [allUserTags, setAllUserTags] = useState<{ id: string; name: string }[]>([]);
@@ -28,13 +44,13 @@ export default function LibraryPage() {
   const [editingBook, setEditingBook] = useState<BookData | null>(null);
 
   const supabaseRef = useRef<SupabaseClient | null>(null);
-  if (!supabaseRef.current && typeof window !== "undefined") supabaseRef.current = createClient();
-  const supabase = supabaseRef.current!;
+  const getSupabase = useCallback(() => {
+    if (supabaseRef.current === null) supabaseRef.current = createClient();
+    return supabaseRef.current;
+  }, []);
 
-  useEffect(() => { fetchLibraryData(); }, []);
-
-  const fetchLibraryData = async () => {
-    setLoading(true);
+  const fetchLibraryData = useCallback(async () => {
+    const supabase = getSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
 
@@ -45,7 +61,7 @@ export default function LibraryPage() {
     const { data: shelvesData } = await supabase.from("shelf_books").select(`book_id, shelves (id, name)`).eq("user_id", user.id);
 
     if (ubData) {
-      setBooks(ubData.map((ub: any) => {
+      setBooks((ubData as unknown as LibraryBookRow[]).map((ub) => {
         const book = ub.books;
         const bookTags = tagsData?.filter(t => t.book_id === ub.book_id).map(t => t.tags).filter(Boolean) as unknown as BookTag[];
         const bookShelves = shelvesData?.filter(s => s.book_id === ub.book_id).map(s => s.shelves).filter(Boolean) as unknown as BookShelf[];
@@ -53,10 +69,13 @@ export default function LibraryPage() {
       }));
     }
     setLoading(false);
-  };
+  }, [getSupabase]);
+
+  useEffect(() => { void fetchLibraryData(); }, [fetchLibraryData]);
 
   const handleDelete = async (bookId: string) => {
     if (!confirm("Are you sure you want to remove this book?")) return;
+    const supabase = getSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.from("reading_sessions").delete().eq("book_id", bookId).eq("user_id", user.id);
@@ -124,12 +143,12 @@ export default function LibraryPage() {
         <header className="mb-10"><h2 className="text-3xl md:text-4xl font-bold text-zinc-100 tracking-tight mb-1">{activeShelfId ? "Shelf View" : statusFilter === "all" ? "My Library" : statusFilter === "reading" ? "Currently Reading" : statusFilter === "plan_to_read" ? "Want to Read" : "Finished"}</h2><p className="text-sm text-zinc-500">{statusFilter === "all" ? "Your personal collection. Pick up where you left off." : `${filteredBooks.length} ${filteredBooks.length === 1 ? "book" : "books"} found`}</p></header>
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-4"><div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           <div className="relative flex-1 lg:w-72 group focus-within:ring-1 focus-within:ring-gold-500/30 rounded-lg transition-shadow"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" /><input type="text" placeholder="Search library..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 rounded-lg bg-[#111113] border border-[#1f1f23] focus:outline-none focus:border-gold-500/40 text-sm text-zinc-100 placeholder-zinc-600 transition-colors" /></div>
-          <div className="relative"><select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="appearance-none pl-3.5 pr-8 py-2 rounded-lg bg-[#111113] border border-[#1f1f23] text-sm text-zinc-400 focus:outline-none focus:border-gold-500/40 cursor-pointer"><option value="recent">Recently Opened</option><option value="title">Title</option><option value="progress">Progress</option></select><ArrowDownAZ className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 pointer-events-none" /></div>
+          <div className="relative"><select value={sortBy} onChange={e => setSortBy(e.target.value as SortMode)} className="appearance-none pl-3.5 pr-8 py-2 rounded-lg bg-[#111113] border border-[#1f1f23] text-sm text-zinc-400 focus:outline-none focus:border-gold-500/40 cursor-pointer"><option value="recent">Recently Opened</option><option value="title">Title</option><option value="progress">Progress</option></select><ArrowDownAZ className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 pointer-events-none" /></div>
           <div className="hidden sm:flex items-center bg-[#111113] border border-[#1f1f23] rounded-lg p-0.5 shrink-0"><button onClick={() => setViewMode("grid")} className={cn("p-2 rounded-md transition-all cursor-pointer", viewMode === "grid" ? "bg-zinc-800 text-gold-400 shadow-sm" : "text-zinc-600 hover:text-zinc-300")}><LayoutGrid className="w-4 h-4" /></button><button onClick={() => setViewMode("list")} className={cn("p-2 rounded-md transition-all cursor-pointer", viewMode === "list" ? "bg-zinc-800 text-gold-400 shadow-sm" : "text-zinc-600 hover:text-zinc-300")}><List className="w-4 h-4" /></button></div>
           <div className="shrink-0"><BookUploader onUploadComplete={fetchLibraryData} /></div>
         </div></div>
 
-        {filteredBooks.length === 0 ? <div className="text-center py-20 bg-[#111113]/60 rounded-2xl border border-[#1f1f23]"><div className="w-16 h-16 rounded-2xl bg-zinc-800/50 flex items-center justify-center mx-auto mb-5"><Filter className="w-7 h-7 text-zinc-700" /></div><h2 className="text-lg font-semibold text-zinc-300 mb-2">No books found</h2><p className="text-zinc-600 text-sm">You don't have any books matching this filter.</p></div> : <div className={viewMode === "grid" ? "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" : "space-y-3"}>{filteredBooks.map(renderCard)}</div>}
+        {filteredBooks.length === 0 ? <div className="text-center py-20 bg-[#111113]/60 rounded-2xl border border-[#1f1f23]"><div className="w-16 h-16 rounded-2xl bg-zinc-800/50 flex items-center justify-center mx-auto mb-5"><Filter className="w-7 h-7 text-zinc-700" /></div><h2 className="text-lg font-semibold text-zinc-300 mb-2">No books found</h2><p className="text-zinc-600 text-sm">You don&apos;t have any books matching this filter.</p></div> : <div className={viewMode === "grid" ? "library-book-grid" : "space-y-3"}>{filteredBooks.map(renderCard)}</div>}
 
         {managingCollectionsForBook && <ManageCollectionsDialog bookId={managingCollectionsForBook.id} bookTitle={managingCollectionsForBook.title} initialTags={managingCollectionsForBook.tags} initialShelves={managingCollectionsForBook.shelves} onClose={() => setManagingCollectionsForBook(null)} onUpdate={fetchLibraryData} />}
         {editingBook && <EditBookMetadataDialog bookId={editingBook.book_id} initialMetadata={{ title: editingBook.title, author: editingBook.author || "", description: editingBook.description || "", cover_url: editingBook.cover_url || "" }} onClose={() => setEditingBook(null)} onSaved={(metadata) => handleMetadataSaved(editingBook.book_id, metadata)} />}

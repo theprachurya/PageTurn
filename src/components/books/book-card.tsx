@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, MoreVertical, Trash2, CheckCircle, Book, Clock, Folder, Pencil } from "lucide-react";
+import { BookOpen, MoreVertical, Trash2, CheckCircle, Book, Clock, Folder, Pencil, type LucideIcon } from "lucide-react";
 import { ProgressRing } from "./progress-ring";
 import { cn } from "@/lib/utils";
 import type { BookStatus } from "@/app/actions/library.actions";
@@ -42,7 +42,7 @@ interface BookCardProps {
   onManageTags?: (bookId: string) => void;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
+const STATUS_CONFIG: Record<string, { label: string; icon: LucideIcon; color: string }> = {
   plan_to_read: { label: "Plan to Read", icon: Clock, color: "text-blue-400 bg-blue-950/50 border-blue-800/30" },
   reading: { label: "Reading", icon: Book, color: "text-gold-400 bg-gold-950/50 border-gold-800/30" },
   completed: { label: "Completed", icon: CheckCircle, color: "text-emerald-400 bg-emerald-950/50 border-emerald-800/30" },
@@ -106,7 +106,7 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onE
   const coverMenu = (
     <>
       {menuOpen && menu}
-      <button onClick={toggleMenu} aria-label={`Options for ${book.title}`} className="absolute bottom-2 right-2 z-30 p-2 rounded-lg bg-black/60 text-zinc-300 hover:text-white hover:bg-black/80 backdrop-blur-sm transition-colors cursor-pointer shadow-lg opacity-0 group-hover:opacity-100">
+      <button onClick={toggleMenu} aria-label={`Options for ${book.title}`} aria-expanded={menuOpen} className="book-card-options absolute bottom-2 right-2 z-30 p-2 rounded-lg bg-black/60 text-zinc-300 hover:text-white hover:bg-black/80 backdrop-blur-sm transition-colors cursor-pointer shadow-lg opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
         <MoreVertical className="w-4 h-4" />
       </button>
     </>
@@ -144,7 +144,7 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onE
         {coverMenu}
       </div>
       <div className="p-3.5 flex-1 flex flex-col">
-        <h3 className="font-semibold text-sm text-zinc-100 group-hover:text-gold-400 transition-colors truncate">{book.title}</h3>
+        <h3 className="min-h-10 line-clamp-2 font-semibold text-sm leading-5 text-zinc-100 group-hover:text-gold-400 transition-colors">{book.title}</h3>
         <p className="text-xs text-zinc-500 truncate mt-0.5 mb-2">{book.author || "Unknown Author"}</p>
         {book.tags && book.tags.length > 0 && <div className="flex flex-wrap gap-1 mb-2">{book.tags.slice(0, 3).map(tag => <span key={tag.id} className="text-[9px] px-1.5 py-0.5 rounded-full border border-zinc-800/60 text-zinc-400 bg-zinc-900/30 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />{tag.name}</span>)}{book.tags.length > 3 && <span className="text-[9px] px-1 py-0.5 rounded-full text-zinc-600">+{book.tags.length - 3}</span>}</div>}
       </div>

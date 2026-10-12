@@ -175,6 +175,9 @@ body {
 .app-orbit { position: fixed; z-index: 0; top: -330px; right: -190px; width: min(75vw, 820px); aspect-ratio: 1; border: 1px solid rgba(215, 243, 106, .11); border-radius: 50%; pointer-events: none; }
 .app-orbit::after { position: absolute; inset: 85px; border: 1px solid rgba(215, 243, 106, .1); border-radius: inherit; content: ""; }
 
+.library-book-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); align-items: start; gap: 1.25rem; }
+@media (hover: none) { .book-card-options { opacity: 1; } }
+
 .app-landing { --landing-forest: #17201b; }
 .landing-nav { box-shadow: 0 1px 0 rgba(255,255,255,.02); backdrop-filter: blur(12px); }
 .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; color: #17201b; background: #d7f36a; }
