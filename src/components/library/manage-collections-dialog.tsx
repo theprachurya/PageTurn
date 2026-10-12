@@ -36,22 +36,32 @@ export function ManageCollectionsDialog({ bookId, bookTitle, initialTags, initia
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchCollections();
-  }, []);
+    let ignore = false;
 
-  const fetchCollections = async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    async function loadCollections() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || ignore) {
+        if (!ignore) setLoading(false);
+        return;
+      }
+
       const [tagsRes, shelvesRes] = await Promise.all([
         supabase.from("tags").select("*").eq("user_id", user.id).order("name"),
         supabase.from("shelves").select("*").eq("user_id", user.id).order("name")
       ]);
+
+      if (ignore) return;
       if (tagsRes.data) setAllTags(tagsRes.data);
       if (shelvesRes.data) setAllShelves(shelvesRes.data);
+      setLoading(false);
     }
-    setLoading(false);
-  };
+
+    void loadCollections();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleToggleTag = async (tagId: string) => {
     setIsSubmitting(true);

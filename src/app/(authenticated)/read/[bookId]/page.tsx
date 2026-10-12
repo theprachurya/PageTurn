@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getCachedEpub, cacheEpub } from "@/lib/epub-cache";
 import { EpubReader } from "@/components/reader/epub-reader";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 export default function ReadPage() {
   const params = useParams();
@@ -17,15 +16,10 @@ export default function ReadPage() {
   const [loading, setLoading] = useState(true);
   const [loadingStatus, setLoadingStatus] = useState("Loading your book...");
   const [error, setError] = useState<string | null>(null);
-  const supabaseRef = useRef<SupabaseClient | null>(null);
-  const getSupabase = useCallback(() => {
-    if (supabaseRef.current === null) supabaseRef.current = createClient();
-    return supabaseRef.current;
-  }, []);
 
   const loadBook = useCallback(async () => {
     try {
-      const supabase = getSupabase();
+      const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -97,12 +91,17 @@ export default function ReadPage() {
       setError("Failed to load book");
       setLoading(false);
     }
-  }, [bookId, getSupabase, router]);
+  }, [bookId, router]);
 
   useEffect(() => {
-    // loadBook updates state after its initial asynchronous auth lookup.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadBook();
+    let ignore = false;
+    async function run() {
+      if (!ignore) await loadBook();
+    }
+    void run();
+    return () => {
+      ignore = true;
+    };
   }, [loadBook]);
 
   if (loading) {

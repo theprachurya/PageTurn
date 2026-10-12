@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Flame,
@@ -11,8 +11,7 @@ import {
 } from "lucide-react";
 import { StreakHeatmap } from "@/components/history/streak-heatmap";
 import { DailyGoalRing } from "@/components/history/daily-goal-ring";
-import { formatDistanceToNow } from "date-fns";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { formatDistanceToNow, format, subDays } from "date-fns";
 
 interface Session {
   id: string;
@@ -40,111 +39,119 @@ export default function HistoryPage() {
   const [totalBooksRead, setTotalBooksRead] = useState(0);
   const [currentlyReading, setCurrentlyReading] = useState(0);
   const [loading, setLoading] = useState(true);
-  const supabaseRef = useRef<SupabaseClient | null>(null);
-  if (!supabaseRef.current && typeof window !== "undefined") {
-    supabaseRef.current = createClient();
-  }
-  const supabase = supabaseRef.current!;
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    let ignore = false;
 
-  const fetchData = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+    async function loadData() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || ignore) return;
 
-    const [
-      profileResult,
-      sessionsResult,
-      recentResult,
-      completedCountResult,
-      readingCountResult
-    ] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("daily_goal_minutes")
-        .eq("id", user.id)
-        .single(),
+      const [
+        profileResult,
+        sessionsResult,
+        recentResult,
+        completedCountResult,
+        readingCountResult
+      ] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("daily_goal_minutes")
+          .eq("id", user.id)
+          .single(),
 
-      supabase
-        .from("reading_sessions")
-        .select("session_date, duration_minutes")
-        .eq("user_id", user.id)
-        .order("session_date", { ascending: false }),
+        supabase
+          .from("reading_sessions")
+          .select("session_date, duration_minutes")
+          .eq("user_id", user.id)
+          .order("session_date", { ascending: false }),
 
-      supabase
-        .from("reading_sessions")
-        .select(
+        supabase
+          .from("reading_sessions")
+          .select(
+            `
+            id,
+            book_id,
+            session_date,
+            start_time,
+            end_time,
+            duration_minutes,
+            chapter_name,
+            books (
+              title,
+              author,
+              cover_url
+            )
           `
-          id,
-          book_id,
-          session_date,
-          start_time,
-          end_time,
-          duration_minutes,
-          chapter_name,
-          books (
-            title,
-            author,
-            cover_url
           )
-        `
-        )
-        .eq("user_id", user.id)
-        .order("start_time", { ascending: false })
-        .limit(20),
+          .eq("user_id", user.id)
+          .order("start_time", { ascending: false })
+          .limit(20),
 
-      supabase
-        .from("user_books")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("status", "completed"),
+        supabase
+          .from("user_books")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("status", "completed"),
 
-      supabase
-        .from("user_books")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("status", "reading")
-    ]);
+        supabase
+          .from("user_books")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("status", "reading")
+      ]);
 
-    if (profileResult.data) setDailyGoal(profileResult.data.daily_goal_minutes);
+      if (ignore) return;
 
-    if (sessionsResult.data) {
-      const byDate: Record<string, number> = {};
-      sessionsResult.data.forEach(
-        (s: { session_date: string; duration_minutes: number }) => {
-          byDate[s.session_date] =
-            (byDate[s.session_date] || 0) + s.duration_minutes;
+      if (profileResult.data) setDailyGoal(profileResult.data.daily_goal_minutes);
+
+      if (sessionsResult.data) {
+        const byDate: Record<string, number> = {};
+        sessionsResult.data.forEach(
+          (s: { session_date: string; duration_minutes: number }) => {
+            byDate[s.session_date] =
+              (byDate[s.session_date] || 0) + s.duration_minutes;
+          }
+        );
+        setSessionsByDate(byDate);
+
+        const todayStr = format(new Date(), "yyyy-MM-dd");
+        setTodayMinutes(byDate[todayStr] || 0);
+
+        // Streak calculation: preserve streak if read today or yesterday
+        let currentStreak = 0;
+        let checkDate = new Date();
+        if (!byDate[todayStr] || byDate[todayStr] <= 0) {
+          checkDate = subDays(checkDate, 1);
         }
-      );
-      setSessionsByDate(byDate);
 
-      const today = new Date().toISOString().split("T")[0];
-      setTodayMinutes(byDate[today] || 0);
-
-      let currentStreak = 0;
-      const d = new Date();
-      while (true) {
-        const dateStr = d.toISOString().split("T")[0];
-        if (byDate[dateStr] && byDate[dateStr] > 0) {
-          currentStreak++;
-          d.setDate(d.getDate() - 1);
-        } else {
-          break;
+        while (true) {
+          const dateStr = format(checkDate, "yyyy-MM-dd");
+          if (byDate[dateStr] && byDate[dateStr] > 0) {
+            currentStreak++;
+            checkDate = subDays(checkDate, 1);
+          } else {
+            break;
+          }
         }
+        setStreak(currentStreak);
       }
-      setStreak(currentStreak);
+
+      if (recentResult.data) setRecentSessions(recentResult.data as unknown as Session[]);
+
+      setTotalBooksRead(completedCountResult.count || 0);
+      setCurrentlyReading(readingCountResult.count || 0);
+      setLoading(false);
     }
 
-    if (recentResult.data) setRecentSessions(recentResult.data as unknown as Session[]);
-
-    setTotalBooksRead(completedCountResult.count || 0);
-    setCurrentlyReading(readingCountResult.count || 0);
-    setLoading(false);
-  };
+    void loadData();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   if (loading) {
     return (

@@ -14,7 +14,6 @@ import {
   Line
 } from "recharts";
 import { Loader2, Flame, BookOpen, Clock, Activity, CalendarDays, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export default function StatsPage() {
   const [stats, setStats] = useState<StatsData | null>(null);

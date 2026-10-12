@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export type Highlight = {
@@ -16,8 +16,7 @@ export function useHighlights(bookId: string) {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLocalMode, setIsLocalMode] = useState(false);
-  const supabaseRef = useRef(createClient());
-  const supabase = supabaseRef.current;
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     let mounted = true;
@@ -34,7 +33,7 @@ export function useHighlights(bookId: string) {
         if (localData && mounted) {
           try {
             setHighlights(JSON.parse(localData));
-          } catch (e) {
+          } catch {
             console.error("Failed to parse local highlights");
           }
         }
@@ -63,7 +62,7 @@ export function useHighlights(bookId: string) {
     return () => {
       mounted = false;
     };
-  }, [bookId]);
+  }, [bookId, supabase]);
 
   const addHighlight = useCallback(async (
     highlight: Omit<Highlight, "id" | "created_at" | "user_id">
@@ -106,7 +105,7 @@ export function useHighlights(bookId: string) {
       return data as Highlight;
     }
     return null;
-  }, [bookId, isLocalMode]);
+  }, [bookId, isLocalMode, supabase]);
 
   const removeHighlight = useCallback(async (id: string) => {
     if (isLocalMode) {
@@ -128,7 +127,7 @@ export function useHighlights(bookId: string) {
     if (error) {
       console.error("Error removing highlight:", error);
     }
-  }, [bookId, isLocalMode]);
+  }, [bookId, isLocalMode, supabase]);
 
   const updateHighlightNote = useCallback(async (id: string, note: string) => {
     if (isLocalMode) {
@@ -152,7 +151,7 @@ export function useHighlights(bookId: string) {
     if (error) {
       console.error("Error updating highlight:", error);
     }
-  }, [bookId, isLocalMode]);
+  }, [bookId, isLocalMode, supabase]);
 
   return {
     highlights,

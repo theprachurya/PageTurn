@@ -146,7 +146,7 @@ export async function getStats(range: StatsRange = "30"): Promise<StatsData> {
   return stats;
 }
 
-export async function exportAllUserData(): Promise<any> {
+export async function exportAllUserData(): Promise<Record<string, unknown>> {
   const { supabase, user } = await requireUser();
 
   const [

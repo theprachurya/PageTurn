@@ -1,6 +1,6 @@
 "use client";
 
-import { Palette, BookA, X } from "lucide-react";
+import { BookA, X } from "lucide-react";
 
 interface HighlightActionBarProps {
   x: number;

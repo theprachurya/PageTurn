@@ -1,33 +1,28 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { BookOpen, ArrowRight, Clock, Sparkles } from "lucide-react";
 import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
-import { updateReadingStatus, type BookStatus } from "@/app/actions/library.actions";
+import { updateReadingStatus, deleteBook, type BookStatus } from "@/app/actions/library.actions";
+import { removeCachedEpub } from "@/lib/epub-cache";
 import { ManageCollectionsDialog } from "@/components/library/manage-collections-dialog";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 export default function ShelfPage() {
   const [books, setBooks] = useState<BookData[]>([]);
   const [loading, setLoading] = useState(true);
   const [managingCollectionsForBook, setManagingCollectionsForBook] = useState<{ id: string, title: string, tags: BookTag[], shelves: BookShelf[] } | null>(null);
-  const supabaseRef = useRef<SupabaseClient | null>(null);
-  if (!supabaseRef.current && typeof window !== "undefined") {
-    supabaseRef.current = createClient();
-  }
-  const supabase = supabaseRef.current!;
 
-  useEffect(() => {
-    fetchBooks();
-  }, []);
-
-  const fetchBooks = async () => {
+  const fetchBooks = useCallback(async () => {
+    const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const [ubResult, tagsResult, shelvesResult] = await Promise.all([
       supabase
@@ -59,18 +54,39 @@ export default function ShelfPage() {
     const shelvesData = shelvesResult.data;
 
     if (ubData) {
-      const mapped = ubData.map((ub: any) => {
-        const book = ub.books;
-        
-        const bookTags = tagsData
-          ?.filter(t => t.book_id === ub.book_id)
-          .map(t => t.tags)
-          .filter(Boolean) as unknown as BookTag[];
+      const tagsByBook = new Map<string, BookTag[]>();
+      for (const row of tagsData || []) {
+        const tag = row.tags as unknown as BookTag | null;
+        if (!tag) continue;
+        const list = tagsByBook.get(row.book_id);
+        if (list) list.push(tag);
+        else tagsByBook.set(row.book_id, [tag]);
+      }
 
-        const bookShelves = shelvesData
-          ?.filter(s => s.book_id === ub.book_id)
-          .map(s => s.shelves)
-          .filter(Boolean) as unknown as BookShelf[];
+      const shelvesByBook = new Map<string, BookShelf[]>();
+      for (const row of shelvesData || []) {
+        const shelf = row.shelves as unknown as BookShelf | null;
+        if (!shelf) continue;
+        const list = shelvesByBook.get(row.book_id);
+        if (list) list.push(shelf);
+        else shelvesByBook.set(row.book_id, [shelf]);
+      }
+
+      const mapped = (ubData as unknown as Array<{
+        id: string;
+        book_id: string;
+        progress_percentage: number | null;
+        current_cfi: string | null;
+        last_read_at: string | null;
+        status: BookStatus | null;
+        books: {
+          title?: string | null;
+          author?: string | null;
+          description?: string | null;
+          cover_url?: string | null;
+        } | null;
+      }>).map((ub) => {
+        const book = ub.books;
 
         return {
           id: ub.id,
@@ -83,14 +99,27 @@ export default function ShelfPage() {
           current_cfi: ub.current_cfi || null,
           last_read_at: ub.last_read_at || null,
           status: ub.status || "reading",
-          tags: bookTags,
-          shelves: bookShelves,
+          tags: tagsByBook.get(ub.book_id) || [],
+          shelves: shelvesByBook.get(ub.book_id) || [],
         };
       });
       setBooks(mapped);
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    async function load() {
+      if (!ignore) {
+        await fetchBooks();
+      }
+    }
+    void load();
+    return () => {
+      ignore = true;
+    };
+  }, [fetchBooks]);
 
   const handleUpdateStatus = async (bookId: string, newStatus: BookStatus) => {
     try {
@@ -113,19 +142,14 @@ export default function ShelfPage() {
 
   const handleDelete = async (bookId: string) => {
     if (!confirm("Are you sure you want to remove this book?")) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    
-    // Cascade deletes
-    await supabase.from("reading_sessions").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("bookmarks").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("highlights").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("book_tags").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("shelf_books").delete().eq("book_id", bookId).eq("user_id", user.id);
-
-    await supabase.from("user_books").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("books").delete().eq("id", bookId).eq("user_id", user.id);
-    fetchBooks();
+    try {
+      await deleteBook(bookId);
+      await removeCachedEpub(bookId);
+      fetchBooks();
+    } catch (err) {
+      console.error("Failed to delete book", err);
+      fetchBooks();
+    }
   };
 
   const latestBook = books[0];

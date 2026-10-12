@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { LogOut, Save, Target, User as UserIcon, Loader2, Download } from "lucide-react";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { exportAllUserData } from "@/app/actions/stats.actions";
 
 export default function SettingsPage() {
@@ -15,36 +14,42 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const supabaseRef = useRef<SupabaseClient | null>(null);
-  if (!supabaseRef.current && typeof window !== "undefined") {
-    supabaseRef.current = createClient();
-  }
-  const supabase = supabaseRef.current!;
 
   useEffect(() => {
-    fetchSettings();
+    let ignore = false;
+
+    async function loadSettings() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || ignore) {
+        if (!ignore) setLoading(false);
+        return;
+      }
+
+      setEmail(user.email || "");
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("daily_goal_minutes")
+        .eq("id", user.id)
+        .single();
+
+      if (ignore) return;
+      if (profile) setDailyGoal(profile.daily_goal_minutes);
+      setLoading(false);
+    }
+
+    void loadSettings();
+    return () => {
+      ignore = true;
+    };
   }, []);
-
-  const fetchSettings = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    setEmail(user.email || "");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("daily_goal_minutes")
-      .eq("id", user.id)
-      .single();
-
-    if (profile) setDailyGoal(profile.daily_goal_minutes);
-    setLoading(false);
-  };
 
   const handleSave = async () => {
     setSaving(true);
+    const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -61,6 +66,7 @@ export default function SettingsPage() {
   };
 
   const handleSignOut = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/");
   };

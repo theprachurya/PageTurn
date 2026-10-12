@@ -28,18 +28,27 @@ export function ManageTagsDialog({ bookId, bookTitle, initialTags, onClose, onUp
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchUserTags();
-  }, []);
+    let ignore = false;
 
-  const fetchUserTags = async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    async function loadUserTags() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || ignore) {
+        if (!ignore) setLoading(false);
+        return;
+      }
+
       const { data } = await supabase.from("tags").select("*").eq("user_id", user.id).order("name");
+      if (ignore) return;
       if (data) setAllTags(data);
+      setLoading(false);
     }
-    setLoading(false);
-  };
+
+    void loadUserTags();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleToggleTag = async (tagId: string) => {
     setIsSubmitting(true);

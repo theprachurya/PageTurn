@@ -1,29 +1,21 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function DevLoginPage() {
-  if (process.env.NODE_ENV !== "development") {
-    return <div className="p-8 text-center text-red-500 font-bold">404 - Not Found (Dev Only)</div>;
-  }
-
   const router = useRouter();
   const [status, setStatus] = useState("Initializing dev login...");
-  
-  const supabaseRef = useRef<any>(null);
-  if (!supabaseRef.current && typeof window !== "undefined") {
-    supabaseRef.current = createClient();
-  }
-  const supabase = supabaseRef.current;
+  const isDev = process.env.NODE_ENV === "development";
 
   useEffect(() => {
+    if (!isDev) return;
+    const supabase = createClient();
     async function login() {
-      if (!supabase) return;
       setStatus("Authenticating test@example.com...");
       
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email: "test@example.com",
         password: "password123",
       });
@@ -42,7 +34,11 @@ export default function DevLoginPage() {
     }
     
     login();
-  }, [router, supabase]);
+  }, [router, isDev]);
+
+  if (!isDev) {
+    return <div className="p-8 text-center text-red-500 font-bold">404 - Not Found (Dev Only)</div>;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#09090b] text-zinc-100 p-4">
