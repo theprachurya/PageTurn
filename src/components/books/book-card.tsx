@@ -86,6 +86,25 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onE
   };
 
   const closeMenu = () => setMenuOpen(false);
+  const handleCardPointerMove = (event: React.PointerEvent<HTMLAnchorElement>) => {
+    if (event.pointerType !== "mouse" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width;
+    const y = (event.clientY - bounds.top) / bounds.height;
+    event.currentTarget.style.setProperty("--card-pointer-x", `${x * 100}%`);
+    event.currentTarget.style.setProperty("--card-pointer-y", `${y * 100}%`);
+    event.currentTarget.style.setProperty("--card-tilt-x", `${((0.5 - y) * 4).toFixed(2)}deg`);
+    event.currentTarget.style.setProperty("--card-tilt-y", `${((x - 0.5) * 5).toFixed(2)}deg`);
+  };
+
+  const handleCardPointerLeave = (event: React.PointerEvent<HTMLAnchorElement>) => {
+    closeMenu();
+    event.currentTarget.style.setProperty("--card-pointer-x", "50%");
+    event.currentTarget.style.setProperty("--card-pointer-y", "35%");
+    event.currentTarget.style.setProperty("--card-tilt-x", "0deg");
+    event.currentTarget.style.setProperty("--card-tilt-y", "0deg");
+  };
 
   const statusConfig = STATUS_CONFIG[book.status] || STATUS_CONFIG.reading;
   const StatusIcon = statusConfig.icon;
@@ -114,7 +133,7 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onE
 
   if (variant === "list") {
     return (
-      <Link href={`/read/${book.book_id}`} onMouseLeave={closeMenu} className="group relative flex gap-4 p-4 rounded-xl bg-[#111113] border border-[#1f1f23] hover:border-gold-500/25 hover:shadow-lg hover:shadow-gold-500/[0.03] transition-all duration-300">
+      <Link href={`/read/${book.book_id}`} onPointerMove={handleCardPointerMove} onPointerLeave={handleCardPointerLeave} className="book-card group relative flex gap-4 p-4 border border-[#1f1f23]">
         <div className="w-20 h-28 rounded-lg overflow-visible bg-zinc-950 border border-zinc-800/60 flex-shrink-0 relative">
           <div className="w-full h-full overflow-hidden rounded-lg">
             {book.cover_url ? <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-zinc-900"><BookOpen className="w-8 h-8 text-zinc-800" /></div>}
@@ -134,7 +153,7 @@ export function BookCard({ book, variant = "grid", onDelete, onUpdateStatus, onE
   }
 
   return (
-    <Link href={`/read/${book.book_id}`} onMouseLeave={closeMenu} className="group relative flex flex-col rounded-xl bg-[#111113] border border-[#1f1f23] hover:border-gold-500/25 hover:shadow-lg hover:shadow-gold-500/[0.03] transition-all duration-300 hover:-translate-y-0.5 overflow-hidden">
+    <Link href={`/read/${book.book_id}`} onPointerMove={handleCardPointerMove} onPointerLeave={handleCardPointerLeave} className="book-card group relative flex flex-col border border-[#1f1f23]">
       <div className="aspect-[2/3] w-full bg-zinc-950 relative overflow-visible">
         <div className="w-full h-full overflow-hidden rounded-t-xl">
           {book.cover_url ? <img src={book.cover_url} alt={book.title} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" /> : <div className="w-full h-full flex items-center justify-center bg-zinc-950"><BookOpen className="w-12 h-12 text-zinc-800" /></div>}

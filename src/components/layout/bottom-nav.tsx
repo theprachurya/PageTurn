@@ -17,7 +17,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#17201b]/96 backdrop-blur-xl border-t border-zinc-800/70 safe-area-bottom">
+    <nav className="app-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#17201b]/96 backdrop-blur-xl border-t border-zinc-800/70 safe-area-bottom">
       <div className="flex items-center justify-around px-2 py-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
@@ -31,18 +31,20 @@ export function BottomNav() {
                   ? "text-gold-500"
                   : "text-zinc-600 hover:text-zinc-400"
               )}
+              data-active={isActive ? "true" : undefined}
+              aria-current={isActive ? "page" : undefined}
             >
               <item.icon className={cn("w-5 h-5", isActive && "text-gold-500")} />
               <span
                 className={cn(
-                  "text-[10px] font-medium",
+                  "font-mono text-[9px] uppercase tracking-[0.08em] font-medium",
                   isActive ? "text-gold-400 font-semibold" : "text-zinc-600"
                 )}
               >
                 {item.label}
               </span>
               {isActive && (
-                <div className="absolute top-0 w-5 h-0.5 bg-gold-500 rounded-full" />
+                <div className="bottom-nav-indicator absolute top-0 w-5 h-0.5 bg-gold-500 rounded-full" />
               )}
             </Link>
           );

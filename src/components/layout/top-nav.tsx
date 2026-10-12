@@ -16,11 +16,11 @@ export function TopNav() {
   const pathname = usePathname();
 
   return (
-    <header className="hidden md:flex fixed top-0 left-0 w-full z-50 justify-between items-center px-8 h-14 bg-[#17201b]/96 backdrop-blur-xl border-b border-zinc-800/70 text-zinc-100 font-sans">
+    <header className="app-top-nav hidden md:flex fixed top-0 left-0 w-full z-50 justify-between items-center px-8 h-14 bg-[#17201b]/96 backdrop-blur-xl border-b border-zinc-800/70 text-zinc-100 font-sans">
       <div className="flex items-center gap-8">
         <Link href="/shelf" className="flex items-center gap-2.5 group">
           <BookOpen className="w-5 h-5 text-gold-500 transition-colors group-hover:text-gold-400" />
-          <h1 className="text-lg font-semibold tracking-tight">
+          <h1 className="app-brand text-lg font-semibold tracking-tight">
             Page<span className="text-gold-500">Turn</span>
           </h1>
         </Link>
@@ -34,9 +34,11 @@ export function TopNav() {
                 className={cn(
                   "px-3.5 py-1.5 rounded-lg transition-all text-sm font-medium",
                   isActive
-                    ? "text-gold-400 bg-gold-500/8"
+                    ? "text-gold-400"
                     : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/50"
                 )}
+                data-active={isActive ? "true" : undefined}
+                aria-current={isActive ? "page" : undefined}
               >
                 {item.label}
               </Link>
