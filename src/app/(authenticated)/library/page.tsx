@@ -1,16 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import { LayoutGrid, List, Filter, Library, Clock, Book, CheckCircle, Search, ArrowDownAZ } from "lucide-react";
 import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
 import { BookUploader } from "@/components/upload/book-uploader";
 import { ShelvesSidebar } from "@/components/library/shelves-sidebar";
 import { ManageCollectionsDialog } from "@/components/library/manage-collections-dialog";
 import { EditBookMetadataDialog } from "@/components/library/edit-book-metadata-dialog";
-import { cn } from "@/lib/utils";
-import { updateReadingStatus, type BookStatus } from "@/app/actions/library.actions";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { updateReadingStatus, deleteBook, type BookStatus } from "@/app/actions/library.actions";
+import { removeCachedEpub } from "@/lib/epub-cache";
 
 type FilterStatus = "all" | BookStatus;
 type SortMode = "recent" | "title" | "progress";
@@ -43,14 +43,8 @@ export default function LibraryPage() {
   const [managingCollectionsForBook, setManagingCollectionsForBook] = useState<{ id: string; title: string; tags: BookTag[]; shelves: BookShelf[] } | null>(null);
   const [editingBook, setEditingBook] = useState<BookData | null>(null);
 
-  const supabaseRef = useRef<SupabaseClient | null>(null);
-  const getSupabase = useCallback(() => {
-    if (supabaseRef.current === null) supabaseRef.current = createClient();
-    return supabaseRef.current;
-  }, []);
-
   const fetchLibraryData = useCallback(async () => {
-    const supabase = getSupabase();
+    const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
 
@@ -93,23 +87,29 @@ export default function LibraryPage() {
       }));
     }
     setLoading(false);
-  }, [getSupabase]);
+  }, []);
 
-  useEffect(() => { void fetchLibraryData(); }, [fetchLibraryData]);
+  useEffect(() => {
+    let ignore = false;
+    async function load() {
+      if (!ignore) await fetchLibraryData();
+    }
+    void load();
+    return () => {
+      ignore = true;
+    };
+  }, [fetchLibraryData]);
 
   const handleDelete = async (bookId: string) => {
     if (!confirm("Are you sure you want to remove this book?")) return;
-    const supabase = getSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("reading_sessions").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("bookmarks").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("highlights").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("book_tags").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("shelf_books").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("user_books").delete().eq("book_id", bookId).eq("user_id", user.id);
-    await supabase.from("books").delete().eq("id", bookId).eq("user_id", user.id);
-    fetchLibraryData();
+    try {
+      await deleteBook(bookId);
+      await removeCachedEpub(bookId);
+      fetchLibraryData();
+    } catch (err) {
+      console.error("Failed to delete book", err);
+      fetchLibraryData();
+    }
   };
 
   const handleUpdateStatus = async (bookId: string, newStatus: BookStatus) => {

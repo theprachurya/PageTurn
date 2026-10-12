@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Image, Loader2, Save, X } from "lucide-react";
+import { BookOpen, ImageIcon, Loader2, Save, X } from "lucide-react";
 import { updateBookMetadata, type BookMetadata } from "@/app/actions/library.actions";
 
 interface EditBookMetadataDialogProps {
@@ -119,7 +119,7 @@ export function EditBookMetadataDialog({
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Cover URL</label>
             <div className="relative">
-              <Image className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
+              <ImageIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
               <input
                 type="url"
                 value={metadata.cover_url}

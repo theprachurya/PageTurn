@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "A beautiful web-based EPUB reader with offline support, highlights, bookmarks, and reading analytics.",
     start_url: "/shelf",
     display: "standalone",
-    background_color: "#09090b",
-    theme_color: "#dc2626",
+    background_color: "#17201b",
+    theme_color: "#d7f36a",
     orientation: "any",
     categories: ["books", "education", "productivity"],
     icons: [

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import ePub, { type Book, type Rendition } from "epubjs";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -14,7 +14,7 @@ import {
   addBookmark as addBookmarkAction,
   removeBookmark as removeBookmarkAction,
 } from "@/app/actions/reader.actions";
-import { ReaderToolbar, type NavItem, type BookmarkData, type HighlightData } from "./reader-toolbar";
+import { ReaderToolbar, type NavItem, type BookmarkData } from "./reader-toolbar";
 import { DictionaryPopover } from "./dictionary-popover";
 import { HighlightPopover, type HighlightColor } from "./highlight-popover";
 import { useHighlights } from "@/lib/hooks/use-highlights";
@@ -79,11 +79,7 @@ export function EpubReader({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // We still need the Supabase client for Realtime subscriptions (client-only)
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
-  if (!supabaseRef.current && typeof window !== "undefined") {
-    supabaseRef.current = createClient();
-  }
-  const supabase = supabaseRef.current!;
+  const supabase = useMemo(() => createClient(), []);
 
   // Initialize offline sync listener once
   useEffect(() => {
@@ -112,9 +108,9 @@ export function EpubReader({
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "user_books", filter: `book_id=eq.${bookId}` },
-        (payload) => {
-          const newData = payload.new as any;
-          if (newData.current_cfi && newData.current_cfi !== currentCfiRef.current) {
+        (payload: { new: Record<string, unknown> }) => {
+          const newData = payload.new as { current_cfi?: string; last_read_at?: string };
+          if (newData.current_cfi && newData.current_cfi !== currentCfiRef.current && newData.last_read_at) {
             const timeDiff = new Date().getTime() - new Date(newData.last_read_at).getTime();
             if (timeDiff < 10000) {
               setSyncPrompt({ cfi: newData.current_cfi, date: newData.last_read_at });
@@ -226,7 +222,7 @@ export function EpubReader({
 
     applySettings(rendition, settings);
 
-    (rendition as any).hooks.content.register((contents: any) => {
+    (rendition as unknown as { hooks: { content: { register: (fn: (contents: { document: Document }) => void) => void } } }).hooks.content.register((contents: { document: Document }) => {
       const style = contents.document.createElement("style");
       style.innerHTML = `
         ::-webkit-scrollbar { width: 8px; }
@@ -280,7 +276,7 @@ export function EpubReader({
         highlightsRef.current.forEach(hl => {
           try {
             rendition.annotations.highlight(hl.cfi_range, {}, () => {}, "epub-highlight", { fill: hl.color });
-          } catch (e) { /* ignore — CFI may not be in current view */ }
+          } catch { /* ignore — CFI may not be in current view */ }
         });
       }, 100);
 
@@ -324,10 +320,11 @@ export function EpubReader({
     // Text Selection
     rendition.on("selected", ((...args: unknown[]) => {
       const cfiRange = args[0] as string;
-      const contents = args[1] as any;
-      const range = contents.window.getSelection().getRangeAt(0);
+      const contents = args[1] as { window: Window };
+      const range = contents.window.getSelection()?.getRangeAt(0);
+      if (!range) return;
       const rect = range.getBoundingClientRect();
-      const text = contents.window.getSelection().toString();
+      const text = contents.window.getSelection()?.toString() || "";
       
       const iframe = viewerRef.current?.querySelector("iframe");
       if (iframe) {
@@ -350,14 +347,16 @@ export function EpubReader({
     }));
 
     // Existing Highlight Click (read from ref to avoid stale closure)
-    rendition.on("markClicked", (cfiRange: any, data: any, contents: any) => {
+    rendition.on("markClicked", ((...args: unknown[]) => {
+      const cfiRange = args[0] as string;
+      const contents = args[2] as { document: Document };
       const highlight = highlightsRef.current.find(h => h.cfi_range === cfiRange);
       if (highlight) {
         setActiveHighlightId(highlight.id);
         
         try {
           const range = contents.document.querySelector(`[data-epubcfi="${cfiRange}"]`);
-          const rect = range ? range.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2 };
+          const rect = range ? range.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
           
           const iframe = viewerRef.current?.querySelector("iframe");
           if (iframe && range) {
@@ -369,14 +368,15 @@ export function EpubReader({
           } else {
             setActiveHighlightPos({ x: rect.left, y: rect.top });
           }
-        } catch(e) {
+        } catch {
           setActiveHighlightPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
         }
       }
-    });
+    }));
 
     // Iframe clicks (only toggle on pure left clicks, not selections or middle clicks)
-    rendition.on("click", (e: any) => {
+    rendition.on("click", ((...args: unknown[]) => {
+      const e = args[0] as MouseEvent | undefined;
       // Ignore right or middle clicks (button 1 or 2)
       if (e && e.button !== undefined && e.button !== 0) return;
 
@@ -388,7 +388,7 @@ export function EpubReader({
       }
 
       setShowToolbar(prev => !prev);
-    });
+    }));
 
     book.ready.then(() => {
       return book.locations.generate(1600);
@@ -418,6 +418,7 @@ export function EpubReader({
       rendition.destroy();
       book.destroy();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Book initialization only runs when epubUrl changes; settings and progress are synchronized via dedicated handlers and refs
   }, [epubUrl]);
 
   const updateSettings = (newSettings: Partial<ReaderSettings>) => {
@@ -430,8 +431,6 @@ export function EpubReader({
     }
   };
 
-  const goNext = () => { renditionRef.current?.next(); setSelection(null); };
-  const goPrev = () => { renditionRef.current?.prev(); setSelection(null); };
   const navigateTo = (href: string) => { renditionRef.current?.display(href); setSelection(null); };
 
   const handleCenterTap = (e: React.MouseEvent) => {
@@ -446,20 +445,38 @@ export function EpubReader({
 
   const goNextChapter = () => {
     if (renditionRef.current && bookRef.current && currentCfi) {
-      // @ts-ignore
-      const section = bookRef.current.spine.get(currentCfi);
-      if (section && section.next && section.next()) {
-        renditionRef.current.display(section.next());
+      const bookWithSpine = bookRef.current as unknown as {
+        spine: {
+          get: (cfi: string) => {
+            next?: () => { href?: string; cfiBase?: string } | null;
+          } | null;
+        };
+      };
+      const section = bookWithSpine.spine?.get(currentCfi);
+      if (section && typeof section.next === "function") {
+        const nextSection = section.next();
+        if (nextSection) {
+          renditionRef.current.display(nextSection.href || nextSection.cfiBase);
+        }
       }
     }
   };
 
   const goPrevChapter = () => {
     if (renditionRef.current && bookRef.current && currentCfi) {
-      // @ts-ignore
-      const section = bookRef.current.spine.get(currentCfi);
-      if (section && section.prev && section.prev()) {
-        renditionRef.current.display(section.prev());
+      const bookWithSpine = bookRef.current as unknown as {
+        spine: {
+          get: (cfi: string) => {
+            prev?: () => { href?: string; cfiBase?: string } | null;
+          } | null;
+        };
+      };
+      const section = bookWithSpine.spine?.get(currentCfi);
+      if (section && typeof section.prev === "function") {
+        const prevSection = section.prev();
+        if (prevSection) {
+          renditionRef.current.display(prevSection.href || prevSection.cfiBase);
+        }
       }
     }
   };
@@ -484,7 +501,7 @@ export function EpubReader({
       try {
         const data = await addBookmarkAction(bookId, currentCfi, chapter || "Bookmark");
         if (data) setBookmarks(prev => [data, ...prev]);
-      } catch (err) {
+      } catch {
         // If offline, queue it and add optimistically
         await enqueue({
           type: "addBookmark",
@@ -585,8 +602,18 @@ export function EpubReader({
       const results: { cfi: string; excerpt: string }[] = [];
       const q = query.toLowerCase();
 
-      // @ts-ignore: spine is accessible
-      for (const item of book.spine.spineItems) {
+      const bookWithSpine = book as unknown as {
+        spine?: {
+          spineItems?: Array<{
+            load: (fn: unknown) => Promise<void>;
+            document: Document;
+            cfiFromElement: (el: Element) => string;
+            unload: () => void;
+          }>;
+        };
+      };
+
+      for (const item of bookWithSpine.spine?.spineItems || []) {
         await item.load(book.load.bind(book));
         const text = item.document.body.textContent?.toLowerCase() || "";
         
@@ -621,7 +648,7 @@ export function EpubReader({
       setIsReadingAloud(false);
     } else {
       try {
-        const location = (renditionRef.current as any)?.location;
+        const location = (renditionRef.current as unknown as { location?: { start?: { cfi?: string } } })?.location;
         if (!location || !bookRef.current) return;
         
         // Grab the current chapter's DOM
@@ -629,10 +656,11 @@ export function EpubReader({
         let text = "";
         if (iframe?.contentDocument) {
            text = iframe.contentDocument.body.innerText;
-        } else {
-           const spineItem = (bookRef.current as any).spine.get(location.start.cfi);
-           if (spineItem && (spineItem as any).document) {
-             text = (spineItem as any).document.body.innerText;
+        } else if (location.start?.cfi) {
+           const bookWithSpine = bookRef.current as unknown as { spine?: { get: (cfi: string) => { document?: Document } | null } };
+           const spineItem = bookWithSpine.spine?.get(location.start.cfi);
+           if (spineItem?.document) {
+             text = spineItem.document.body.innerText;
            }
         }
         
@@ -661,16 +689,7 @@ export function EpubReader({
   }, []);
 
   const bgColors = { light: "bg-white", dark: "bg-[#0f0f12]", sepia: "bg-[#f4ecd8]" };
-  const isBookmarked = bookmarks.some(b => {
-    if (!bookRef.current || bookRef.current.locations.length() === 0) return b.cfi === currentCfi;
-    try {
-      const bPct = Math.round(bookRef.current.locations.percentageFromCfi(b.cfi) * 100);
-      const cPct = Math.round(progress);
-      return bPct === cPct;
-    } catch {
-      return b.cfi === currentCfi;
-    }
-  });
+  const isBookmarked = bookmarks.some(b => b.cfi === currentCfi);
 
   return (
     <div className={`fixed inset-0 ${bgColors[settings.theme]} flex flex-col`}>
@@ -725,7 +744,7 @@ export function EpubReader({
         chapterProgress={chapterProgress}
         toc={toc}
         bookmarks={bookmarks}
-        highlights={highlights as any}
+        highlights={highlights}
         estimatedTimeRemaining={estimatedTimeRemaining}
         settings={settings}
         onSettingsChange={updateSettings}

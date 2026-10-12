@@ -16,11 +16,16 @@ export function DictionaryPopover({ word, x, y, onClose }: DictionaryPopoverProp
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
+    let ignore = false;
     lookupWord(word).then((res) => {
-      setDefinition(res);
-      setLoading(false);
+      if (!ignore) {
+        setDefinition(res);
+        setLoading(false);
+      }
     });
+    return () => {
+      ignore = true;
+    };
   }, [word]);
 
   return (
@@ -28,7 +33,7 @@ export function DictionaryPopover({ word, x, y, onClose }: DictionaryPopoverProp
       className="fixed z-50 bg-[#151517] text-zinc-100 rounded-xl shadow-2xl shadow-black/60 border border-zinc-800/60 w-72 max-h-80 overflow-y-auto animate-in fade-in zoom-in-95 duration-200"
       style={{
         top: Math.max(10, y + 10),
-        left: Math.max(10, Math.min(window.innerWidth - 300, x - 144)),
+        left: typeof window !== "undefined" ? Math.max(10, Math.min(window.innerWidth - 300, x - 144)) : x - 144,
       }}
     >
       <div className="sticky top-0 bg-[#151517]/95 backdrop-blur-sm p-3 border-b border-zinc-800/40 flex items-center justify-between">
@@ -67,7 +72,7 @@ export function DictionaryPopover({ word, x, y, onClose }: DictionaryPopoverProp
                       </p>
                       {def.example && (
                         <p className="text-xs text-zinc-500 mt-1 italic">
-                          "{def.example}"
+                          &ldquo;{def.example}&rdquo;
                         </p>
                       )}
                     </li>

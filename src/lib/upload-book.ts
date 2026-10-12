@@ -60,6 +60,11 @@ export async function checkForDrm(file: File): Promise<boolean> {
 // ─── Cover compression ────────────────────────────────────────
 
 async function compressCover(coverBlob: Blob): Promise<Blob> {
+  // If already under 300KB (e.g. extracted and compressed by epub-utils), skip re-compression
+  if (coverBlob.size <= 300 * 1024) {
+    return coverBlob;
+  }
+
   try {
     // Convert Blob to File for the compression library
     const file = new File([coverBlob], "cover.jpg", { type: coverBlob.type || "image/jpeg" });
@@ -187,7 +192,7 @@ export async function uploadBookToSupabase(
         author,
         description,
         cover_url: finalCoverUrl,
-        epub_path: epubData.path,
+        epub_path: epubData?.path || epubFilePath,
       })
       .select()
       .single();

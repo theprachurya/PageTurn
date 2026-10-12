@@ -12,8 +12,6 @@ import {
   X,
   BookOpen,
   Menu,
-  AlignJustify,
-  FileText,
   Bookmark,
   Highlighter,
   Search,
@@ -44,7 +42,7 @@ export interface HighlightData {
   id: string;
   cfi_range: string;
   color: string;
-  note: string | null;
+  note?: string | null;
   text?: string;
   created_at: string;
 }
@@ -139,6 +137,9 @@ export function ReaderToolbar({
               <div className="flex flex-col items-center">
                 <p className="text-xs text-zinc-500 font-mono">
                   {Math.round(progress)}% book
+                  {estimatedTimeRemaining !== undefined && estimatedTimeRemaining !== null && estimatedTimeRemaining > 0 && (
+                    <span className="text-zinc-600"> · ~{estimatedTimeRemaining}m left</span>
+                  )}
                 </p>
                 {chapterProgress > 0 && (
                   <p className="text-[10px] text-zinc-600 font-mono">

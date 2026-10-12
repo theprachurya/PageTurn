@@ -42,7 +42,12 @@ export async function updateBookMetadata(bookId: string, metadata: BookMetadata)
 
 export async function updateReadingStatus(bookId: string, status: BookStatus) {
   const { supabase, user } = await requireUser();
-  const updateData: Record<string, any> = { status };
+  const updateData: {
+    status: BookStatus;
+    completed_at?: string | null;
+    progress_percentage?: number;
+    current_cfi?: string | null;
+  } = { status };
   
   if (status === "completed") {
     updateData.completed_at = new Date().toISOString();
@@ -162,5 +167,54 @@ export async function removeBookFromShelf(bookId: string, shelfId: string) {
     .eq("user_id", user.id);
 
   if (error) throw new Error(error.message);
+  return { success: true };
+}
+
+// ==========================================
+// Delete Book Action
+// ==========================================
+
+export async function deleteBook(bookId: string) {
+  const { supabase, user } = await requireUser();
+
+  // Fetch book record to obtain file paths for storage cleanup
+  const { data: book } = await supabase
+    .from("books")
+    .select("epub_path, cover_url")
+    .eq("id", bookId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  // Cascade database deletes
+  await supabase.from("reading_sessions").delete().eq("book_id", bookId).eq("user_id", user.id);
+  await supabase.from("bookmarks").delete().eq("book_id", bookId).eq("user_id", user.id);
+  await supabase.from("highlights").delete().eq("book_id", bookId).eq("user_id", user.id);
+  await supabase.from("book_tags").delete().eq("book_id", bookId).eq("user_id", user.id);
+  await supabase.from("shelf_books").delete().eq("book_id", bookId).eq("user_id", user.id);
+  await supabase.from("user_books").delete().eq("book_id", bookId).eq("user_id", user.id);
+  const { error } = await supabase.from("books").delete().eq("id", bookId).eq("user_id", user.id);
+
+  if (error) throw new Error(error.message);
+
+  // Clean up storage files if they existed
+  if (book?.epub_path) {
+    try {
+      await supabase.storage.from("epubs").remove([book.epub_path]);
+    } catch {
+      // Non-critical cleanup
+    }
+  }
+
+  if (book?.cover_url) {
+    try {
+      const match = book.cover_url.split("/covers/")[1];
+      if (match) {
+        await supabase.storage.from("covers").remove([decodeURIComponent(match)]);
+      }
+    } catch {
+      // Non-critical cleanup
+    }
+  }
+
   return { success: true };
 }

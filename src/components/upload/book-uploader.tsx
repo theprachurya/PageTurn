@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, X, BookOpen, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Upload, X, BookOpen, Loader2, AlertTriangle } from "lucide-react";
 import { extractEpubMetadata, type ExtractedBookData } from "@/lib/epub-utils";
 import {
   uploadBookToSupabase,
@@ -37,6 +37,9 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
+    if (coverPreview) {
+      URL.revokeObjectURL(coverPreview);
+    }
     setBookData(null);
     setCoverPreview(null);
     setError(null);
@@ -77,6 +80,9 @@ export function BookUploader({ onUploadComplete }: BookUploaderProps) {
       setBookData(extracted);
 
       if (extracted.coverBlob) {
+        if (coverPreview) {
+          URL.revokeObjectURL(coverPreview);
+        }
         const previewUrl = URL.createObjectURL(extracted.coverBlob);
         setCoverPreview(previewUrl);
       }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   ArrowRight,
@@ -11,20 +10,10 @@ import {
   Type,
   Upload,
 } from "lucide-react";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 export default function LandingPage() {
-  const supabaseRef = useRef<SupabaseClient | null>(null);
-
-  const getSupabase = () => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient();
-    }
-    return supabaseRef.current;
-  };
-
   const handleSignIn = async () => {
-    const supabase = getSupabase();
+    const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

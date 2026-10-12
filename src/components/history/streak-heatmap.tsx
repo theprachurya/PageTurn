@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { format, subDays } from "date-fns";
 
 interface StreakHeatmapProps {
   sessionsByDate: Record<string, number>; // date string -> total minutes
@@ -16,9 +17,8 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
     for (let w = numWeeks - 1; w >= 0; w--) {
       const week: { date: string; minutes: number; level: number }[] = [];
       for (let d = 0; d < 7; d++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - w * 7 - (6 - d));
-        const dateStr = date.toISOString().split("T")[0];
+        const date = subDays(today, w * 7 + (6 - d));
+        const dateStr = format(date, "yyyy-MM-dd");
         const minutes = sessionsByDate[dateStr] || 0;
 
         let level = 0;

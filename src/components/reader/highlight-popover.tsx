@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, Palette, MessageSquare } from "lucide-react";
+import { Check, X, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type HighlightColor = "yellow" | "green" | "blue" | "purple" | "red";

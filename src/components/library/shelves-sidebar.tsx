@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Folder, Plus, MoreVertical, Trash2 } from "lucide-react";
+import { Folder, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { createShelf, deleteShelf } from "@/app/actions/library.actions";
 import { cn } from "@/lib/utils";
@@ -24,18 +24,27 @@ export function ShelvesSidebar({ activeShelfId, onSelectShelf }: ShelvesSidebarP
   const [newShelfName, setNewShelfName] = useState("");
 
   useEffect(() => {
-    fetchShelves();
-  }, []);
+    let ignore = false;
 
-  const fetchShelves = async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    async function loadShelves() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || ignore) {
+        if (!ignore) setLoading(false);
+        return;
+      }
+
       const { data } = await supabase.from("shelves").select("*").eq("user_id", user.id).order("created_at");
+      if (ignore) return;
       if (data) setShelves(data);
+      setLoading(false);
     }
-    setLoading(false);
-  };
+
+    void loadShelves();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleCreateShelf = async (e: React.FormEvent) => {
     e.preventDefault();
