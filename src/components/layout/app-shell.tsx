@@ -10,13 +10,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isReader = pathname?.startsWith("/read/");
 
   return (
-    <div className="min-h-screen bg-[#08080a] text-zinc-50 selection:bg-gold-500/20 selection:text-gold-200">
-      {/* Ambient background lighting — subtle warm glow */}
+    <div className="app-shell min-h-screen bg-[#17201b] text-zinc-50 selection:bg-gold-500/20 selection:text-gold-200">
       {!isReader && (
-        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute -top-32 right-1/4 w-[600px] h-[600px] bg-gold-900/8 rounded-full blur-[180px]" />
-          <div className="absolute bottom-0 left-1/3 w-[500px] h-[500px] bg-gold-950/6 rounded-full blur-[200px]" />
-        </div>
+        <div className="app-orbit" aria-hidden="true" />
       )}
       {!isReader && <TopNav />}
       {!isReader && <BottomNav />}

@@ -16,7 +16,7 @@ export function TopNav() {
   const pathname = usePathname();
 
   return (
-    <header className="hidden md:flex fixed top-0 left-0 w-full z-50 justify-between items-center px-8 h-14 bg-[#08080a]/85 backdrop-blur-2xl border-b border-zinc-800/40 text-zinc-100 font-sans">
+    <header className="hidden md:flex fixed top-0 left-0 w-full z-50 justify-between items-center px-8 h-14 bg-[#17201b]/96 backdrop-blur-xl border-b border-zinc-800/70 text-zinc-100 font-sans">
       <div className="flex items-center gap-8">
         <Link href="/shelf" className="flex items-center gap-2.5 group">
           <BookOpen className="w-5 h-5 text-gold-500 transition-colors group-hover:text-gold-400" />
