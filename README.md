@@ -17,7 +17,6 @@ PageTurn is a modern, offline-first personal EPUB e-reader, library manager, and
 | **PWA & Offline** | [@serwist/next](https://github.com/serwist/serwist) (Service Workers) & [localforage](https://localforage.github.io/localForage/) (IndexedDB LRU Cache) |
 | **Data Visualization** | [Recharts 3](https://recharts.org/) & [date-fns 4](https://date-fns.org/) |
 | **Image Processing** | [browser-image-compression](https://github.com/Donaldcwl/browser-image-compression) |
-| **Testing** | [Playwright](https://playwright.dev/) |
 
 ---
 
@@ -86,8 +85,7 @@ PageTurn is a modern, offline-first personal EPUB e-reader, library manager, and
 
 ```
 PageTurn/
-├── public/                     # Static assets, PWA icons, dev sample book, service worker
-│   ├── dev-book.epub           # Local test EPUB
+├── public/                     # Static assets, service worker
 │   └── sw.js                   # Serwist-generated service worker
 │
 ├── src/
@@ -106,8 +104,6 @@ PageTurn/
 │   │   │   └── stats.actions.ts   # Stats aggregation, streaks, full JSON user export
 │   │   │
 │   │   ├── auth/callback/      # OAuth callback handler
-│   │   ├── dev-login/          # Local development quick sign-in route
-│   │   ├── dev-reader/         # Standalone reader harness for rendering tests
 │   │   ├── globals.css         # Tailwind v4 theme, 3D book canvas, card tilt, animations
 │   │   ├── layout.tsx          # Root layout & font definitions
 │   │   ├── manifest.ts         # PWA Web App Manifest
@@ -118,7 +114,7 @@ PageTurn/
 │   │   ├── books/              # BookCard (3D perspective tilt), ProgressRing
 │   │   ├── history/            # StreakHeatmap, DailyGoalRing
 │   │   ├── layout/             # AppShell, TopNav, BottomNav (mobile)
-│   │   ├── library/            # ShelvesSidebar, ManageTagsDialog, ManageCollectionsDialog, EditMetadataDialog
+│   │   ├── library/            # ShelvesSidebar, ManageCollectionsDialog, EditBookMetadataDialog
 │   │   ├── reader/             # EpubReader, ReaderToolbar, HighlightPopover, DictionaryPopover
 │   │   ├── ui/                 # CommandPalette (Cmd+K), ToastContainer
 │   │   └── upload/             # BookUploader (drag-and-drop, DRM validation, cover compression)
@@ -126,7 +122,6 @@ PageTurn/
 │   ├── lib/
 │   │   ├── supabase/           # Browser client, server client, requireUser auth helper
 │   │   ├── app-events.ts       # Global event bus for Command Palette & Uploader modals
-│   │   ├── design-tokens.ts    # Monochromatic Obsidian, Paper & Signal Lime design tokens
 │   │   ├── dictionary.ts       # DictionaryAPI lookup client with memory cache
 │   │   ├── epub-cache.ts       # IndexedDB EPUB cache with LRU eviction
 │   │   ├── epub-utils.ts       # Client-side metadata & cover extraction via epub.js/JSZip
@@ -252,9 +247,6 @@ Verify that the `epubs` (private) and `covers` (public) storage buckets are visi
 npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-> [!TIP]
-> For quick local testing without setting up Google OAuth, visit `/dev-login` to sign in automatically with test credentials (`test@example.com`), or `/dev-reader` to test the EPUB rendering harness directly with a sample book.
 
 ### 6. Linting & Testing
 ```bash

@@ -26,7 +26,7 @@ export function useHighlights(bookId: string) {
       
       const { data: userData } = await supabase.auth.getUser();
       
-      // If we are unauthenticated (e.g., in /dev-reader), fallback to local storage
+      // If unauthenticated, fallback to local storage
       if (!userData.user) {
         setIsLocalMode(true);
         const localData = localStorage.getItem(`highlights_${bookId}`);
