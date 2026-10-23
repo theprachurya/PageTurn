@@ -39,8 +39,7 @@ export default function ReadPage() {
           .select("current_cfi, progress_percentage, last_read_at")
           .eq("user_id", user.id)
           .eq("book_id", bookId)
-          .single()
-          .catch(() => ({ data: null })),
+          .single(),
       ]);
 
       const userBook = userBookRes?.data;
