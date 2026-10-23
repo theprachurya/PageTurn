@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  enqueue,
+  getLocalHighlights,
+  saveLocalHighlight,
+  updateLocalHighlight,
+  removeLocalHighlight,
+} from "@/lib/offline-queue";
 
 export type Highlight = {
   id: string;
@@ -15,7 +22,6 @@ export type Highlight = {
 export function useHighlights(bookId: string) {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isLocalMode, setIsLocalMode] = useState(false);
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
@@ -23,135 +29,151 @@ export function useHighlights(bookId: string) {
 
     async function fetchHighlights() {
       if (!bookId) return;
-      
-      const { data: userData } = await supabase.auth.getUser();
-      
-      // If unauthenticated, fallback to local storage
-      if (!userData.user) {
-        setIsLocalMode(true);
-        const localData = localStorage.getItem(`highlights_${bookId}`);
-        if (localData && mounted) {
-          try {
-            setHighlights(JSON.parse(localData));
-          } catch {
-            console.error("Failed to parse local highlights");
+
+      // 1. Immediately hydrate from local IndexedDB cache (instant offline load)
+      try {
+        const local = await getLocalHighlights(bookId);
+        if (mounted && local.length > 0) {
+          setHighlights(
+            local.map((lh) => ({
+              id: lh.id,
+              book_id: lh.bookId,
+              cfi_range: lh.cfiRange,
+              color: lh.color,
+              note: lh.note ?? undefined,
+              text: lh.text,
+              created_at: lh.createdAt,
+            }))
+          );
+          setLoading(false);
+        }
+      } catch (err) {
+        console.warn("[PageTurn] Failed to read local highlights cache:", err);
+      }
+
+      // 2. Fetch authenticated cloud highlights if online
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+
+        if (!userData.user) {
+          const localData = localStorage.getItem(`highlights_${bookId}`);
+          if (localData && mounted) {
+            try {
+              setHighlights(JSON.parse(localData));
+            } catch {
+              console.error("Failed to parse local highlights");
+            }
+          }
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("highlights")
+          .select("*")
+          .eq("book_id", bookId)
+          .order("created_at", { ascending: true });
+
+        if (error) {
+          console.error("Error fetching highlights:", error);
+        } else if (data && mounted) {
+          setHighlights(data as Highlight[]);
+          // Sync cloud highlights to local store
+          for (const item of data) {
+            await saveLocalHighlight({
+              id: item.id,
+              bookId: item.book_id,
+              cfiRange: item.cfi_range,
+              color: item.color,
+              note: item.note,
+              text: item.text,
+              createdAt: item.created_at,
+            });
           }
         }
-        if (mounted) setLoading(false);
-        return;
+      } catch (err) {
+        console.warn("[PageTurn] Network unavailable, staying in offline highlight mode:", err);
       }
 
-      // Authenticated flow
-      const { data, error } = await supabase
-        .from("highlights")
-        .select("*")
-        .eq("book_id", bookId)
-        .order("created_at", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching highlights:", error);
-      } else if (data && mounted) {
-        setHighlights(data as Highlight[]);
-      }
-      
       if (mounted) setLoading(false);
     }
 
-    fetchHighlights();
-    
+    void fetchHighlights();
+
     return () => {
       mounted = false;
     };
   }, [bookId, supabase]);
 
-  const addHighlight = useCallback(async (
-    highlight: Omit<Highlight, "id" | "created_at" | "user_id">
-  ) => {
-    const newHighlight: Highlight = {
-      ...highlight,
-      id: crypto.randomUUID(),
-      created_at: new Date().toISOString(),
-    };
+  const addHighlight = useCallback(
+    async (highlight: Omit<Highlight, "id" | "created_at" | "user_id">) => {
+      const newHighlight: Highlight = {
+        ...highlight,
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+      };
 
-    if (isLocalMode) {
-      setHighlights((prev) => {
-        const next = [...prev, newHighlight];
-        localStorage.setItem(`highlights_${bookId}`, JSON.stringify(next));
-        return next;
+      // Optimistically update UI
+      setHighlights((prev) => [...prev, newHighlight]);
+
+      // Cache locally in IndexedDB
+      await saveLocalHighlight({
+        id: newHighlight.id,
+        bookId,
+        cfiRange: newHighlight.cfi_range,
+        color: newHighlight.color,
+        note: newHighlight.note,
+        text: newHighlight.text,
+        createdAt: newHighlight.created_at,
       });
+
+      // Enqueue sync mutation (executes immediately if online, or queues if offline)
+      await enqueue({
+        type: "addHighlight",
+        args: {
+          id: newHighlight.id,
+          bookId,
+          cfiRange: newHighlight.cfi_range,
+          color: newHighlight.color,
+          note: newHighlight.note ?? null,
+          text: newHighlight.text,
+          createdAt: newHighlight.created_at,
+        },
+      });
+
       return newHighlight;
-    }
+    },
+    [bookId]
+  );
 
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return null;
+  const removeHighlight = useCallback(
+    async (id: string) => {
+      setHighlights((prev) => prev.filter((h) => h.id !== id));
+      await removeLocalHighlight(id);
 
-    newHighlight.user_id = userData.user.id;
-
-    // Try inserting to Supabase. If `text` column is missing, this might throw if we send it and it doesn't exist,
-    // but typically Postgrest ignores unknown columns if configured, or fails. We should run the migration.
-    const { data, error } = await supabase
-      .from("highlights")
-      .insert(newHighlight)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Error adding highlight:", error);
-      return null;
-    }
-
-    if (data) {
-      setHighlights((prev) => [...prev, data as Highlight]);
-      return data as Highlight;
-    }
-    return null;
-  }, [bookId, isLocalMode, supabase]);
-
-  const removeHighlight = useCallback(async (id: string) => {
-    if (isLocalMode) {
-      setHighlights((prev) => {
-        const next = prev.filter((h) => h.id !== id);
-        localStorage.setItem(`highlights_${bookId}`, JSON.stringify(next));
-        return next;
+      await enqueue({
+        type: "deleteHighlight",
+        args: { id, bookId },
       });
-      return;
-    }
+    },
+    [bookId]
+  );
 
-    setHighlights((prev) => prev.filter((h) => h.id !== id));
-    
-    const { error } = await supabase
-      .from("highlights")
-      .delete()
-      .eq("id", id);
-      
-    if (error) {
-      console.error("Error removing highlight:", error);
-    }
-  }, [bookId, isLocalMode, supabase]);
+  const updateHighlightNote = useCallback(
+    async (id: string, note: string) => {
+      setHighlights((prev) =>
+        prev.map((h) => (h.id === id ? { ...h, note } : h))
+      );
 
-  const updateHighlightNote = useCallback(async (id: string, note: string) => {
-    if (isLocalMode) {
-      setHighlights((prev) => {
-        const next = prev.map((h) => (h.id === id ? { ...h, note } : h));
-        localStorage.setItem(`highlights_${bookId}`, JSON.stringify(next));
-        return next;
+      await updateLocalHighlight(id, { note });
+
+      await enqueue({
+        type: "updateHighlight",
+        args: { id, bookId, note },
       });
-      return;
-    }
-
-    setHighlights((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, note } : h))
-    );
-    
-    const { error } = await supabase
-      .from("highlights")
-      .update({ note })
-      .eq("id", id);
-      
-    if (error) {
-      console.error("Error updating highlight:", error);
-    }
-  }, [bookId, isLocalMode, supabase]);
+    },
+    [bookId]
+  );
 
   return {
     highlights,

@@ -868,9 +868,6 @@ export function EpubReader({
             flipDirection === "prev" && "page-turn-anim-prev"
           )}
         >
-          {/* Central Spine Crease Shadow */}
-          <div className="reader-spine-crease pointer-events-none" />
-
           {/* Realistic Paper Page Deckle Edge */}
           <div className="reader-page-edge pointer-events-none" />
 

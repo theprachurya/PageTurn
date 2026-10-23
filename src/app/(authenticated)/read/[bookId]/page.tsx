@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getCachedEpub, cacheEpub } from "@/lib/epub-cache";
+import { getLocalReadingPosition, resolveConflict } from "@/lib/offline-queue";
 import { EpubReader } from "@/components/reader/epub-reader";
 
 export default function ReadPage() {
@@ -30,17 +31,40 @@ export default function ReadPage() {
 
       // Cache lookup and reading position are independent after authentication.
       setLoadingStatus("Checking local cache...");
-      const [cached, { data: userBook }] = await Promise.all([
+      const [cached, localPosition, userBookRes] = await Promise.all([
         getCachedEpub(bookId),
+        getLocalReadingPosition(bookId),
         supabase
           .from("user_books")
-          .select("current_cfi, progress_percentage")
+          .select("current_cfi, progress_percentage, last_read_at")
           .eq("user_id", user.id)
           .eq("book_id", bookId)
-          .single(),
+          .single()
+          .catch(() => ({ data: null })),
       ]);
 
-      if (userBook) {
+      const userBook = userBookRes?.data;
+
+      if (userBook && localPosition) {
+        // Resolve between local and remote using Last-Write-Wins
+        const resolved = resolveConflict(
+          {
+            cfi: localPosition.cfi,
+            progressPercentage: localPosition.progressPercentage,
+            timestamp: localPosition.timestamp,
+          },
+          {
+            cfi: userBook.current_cfi,
+            progressPercentage: Number(userBook.progress_percentage) || 0,
+            timestamp: userBook.last_read_at || "",
+          }
+        );
+        setInitialCfi(resolved.resolved.cfi);
+        setInitialProgress(resolved.resolved.progressPercentage);
+      } else if (localPosition) {
+        setInitialCfi(localPosition.cfi);
+        setInitialProgress(localPosition.progressPercentage);
+      } else if (userBook) {
         setInitialCfi(userBook.current_cfi);
         setInitialProgress(Number(userBook.progress_percentage) || 0);
       }
