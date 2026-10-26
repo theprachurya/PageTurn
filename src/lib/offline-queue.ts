@@ -500,6 +500,27 @@ export function getActionExecutor(): ActionExecutor | null {
   return customExecutor;
 }
 
+// Serialize queue read/modify/write operations so a concurrent enqueue cannot
+// be overwritten by a flush that is saving its remaining entries.
+let queueOperation = Promise.resolve();
+
+function withQueueLock<T>(operation: () => Promise<T>): Promise<T> {
+  const result = queueOperation.then(operation, operation);
+  queueOperation = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleQueueRetry(delayMs: number): void {
+  if (typeof window === "undefined" || !navigator.onLine || retryTimer) return;
+
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    if (navigator.onLine) void flushQueue();
+  }, delayMs);
+}
+
 async function executeAction(action: QueueAction): Promise<void> {
   if (customExecutor) {
     await customExecutor(action);
@@ -513,6 +534,7 @@ async function executeAction(action: QueueAction): Promise<void> {
     addBookmark,
     removeBookmark,
     addHighlight,
+    updateHighlight,
     removeHighlight,
   } = await import("@/app/actions/reader.actions");
 
@@ -531,16 +553,27 @@ async function executeAction(action: QueueAction): Promise<void> {
       );
       break;
     case "addBookmark":
-      await addBookmark(action.args.bookId, action.args.cfi, action.args.label);
+      await addBookmark(action.args.bookId, action.args.cfi, action.args.label, action.args.id, action.args.createdAt);
       break;
     case "removeBookmark":
       await removeBookmark(action.args.id);
       break;
     case "addHighlight":
-      await addHighlight(action.args.bookId, action.args.cfiRange, action.args.color, action.args.note ?? null);
+      await addHighlight(
+        action.args.bookId,
+        action.args.cfiRange,
+        action.args.color,
+        action.args.note ?? null,
+        action.args.id,
+        action.args.text,
+        action.args.createdAt,
+      );
       break;
     case "updateHighlight":
-      // Handled via local update and optional custom executor/API
+      await updateHighlight(action.args.id, {
+        color: action.args.color,
+        note: action.args.note,
+      });
       break;
     case "deleteHighlight":
       await removeHighlight(action.args.id);
@@ -559,77 +592,114 @@ export async function enqueue(
   action: QueueAction,
   options?: { customId?: string; skipOnlineCheck?: boolean }
 ): Promise<QueueEntry> {
+  const queuedAction: QueueAction = action.type === "addBookmark"
+    ? {
+        ...action,
+        args: {
+          ...action.args,
+          id: action.args.id || crypto.randomUUID(),
+          createdAt: action.args.createdAt || new Date().toISOString(),
+        },
+      }
+    : action.type === "addHighlight"
+      ? {
+          ...action,
+          args: {
+            ...action.args,
+            id: action.args.id || crypto.randomUUID(),
+            createdAt: action.args.createdAt || new Date().toISOString(),
+          },
+        }
+      : action;
+
   // Update local offline cache immediately
   try {
-    if (action.type === "syncProgress") {
+    if (queuedAction.type === "syncProgress") {
       await saveLocalReadingPosition(
-        action.args.bookId,
-        action.args.cfi,
-        action.args.progressPercentage
+        queuedAction.args.bookId,
+        queuedAction.args.cfi,
+        queuedAction.args.progressPercentage
       );
-    } else if (action.type === "addBookmark") {
-      const bookmarkId = action.args.id || crypto.randomUUID();
+    } else if (queuedAction.type === "addBookmark") {
+      const bookmarkId = queuedAction.args.id!;
       await saveLocalBookmark({
         id: bookmarkId,
-        bookId: action.args.bookId,
-        cfi: action.args.cfi,
-        label: action.args.label,
-        createdAt: action.args.createdAt || new Date().toISOString(),
+        bookId: queuedAction.args.bookId,
+        cfi: queuedAction.args.cfi,
+        label: queuedAction.args.label,
+        createdAt: queuedAction.args.createdAt!,
       });
-    } else if (action.type === "removeBookmark") {
-      await removeLocalBookmark(action.args.id);
-    } else if (action.type === "addHighlight") {
-      const highlightId = action.args.id || crypto.randomUUID();
+    } else if (queuedAction.type === "removeBookmark") {
+      await removeLocalBookmark(queuedAction.args.id);
+    } else if (queuedAction.type === "addHighlight") {
+      const highlightId = queuedAction.args.id!;
       await saveLocalHighlight({
         id: highlightId,
-        bookId: action.args.bookId,
-        cfiRange: action.args.cfiRange,
-        color: action.args.color,
-        note: action.args.note,
-        text: action.args.text,
-        createdAt: action.args.createdAt || new Date().toISOString(),
+        bookId: queuedAction.args.bookId,
+        cfiRange: queuedAction.args.cfiRange,
+        color: queuedAction.args.color,
+        note: queuedAction.args.note,
+        text: queuedAction.args.text,
+        createdAt: queuedAction.args.createdAt!,
       });
-    } else if (action.type === "updateHighlight") {
-      await updateLocalHighlight(action.args.id, {
-        color: action.args.color,
-        note: action.args.note,
-        updatedAt: action.args.updatedAt,
+    } else if (queuedAction.type === "updateHighlight") {
+      await updateLocalHighlight(queuedAction.args.id, {
+        color: queuedAction.args.color,
+        note: queuedAction.args.note,
+        updatedAt: queuedAction.args.updatedAt,
       });
-    } else if (action.type === "deleteHighlight") {
-      await removeLocalHighlight(action.args.id);
+    } else if (queuedAction.type === "deleteHighlight") {
+      await removeLocalHighlight(queuedAction.args.id);
     }
   } catch (err) {
     console.warn("[PageTurn] Failed to update local offline store:", err);
   }
 
-  // Attempt direct execution if online
-  if (!options?.skipOnlineCheck && typeof navigator !== "undefined" && navigator.onLine) {
-    try {
-      await executeAction(action);
-      const entry: QueueEntry = {
-        id: options?.customId || crypto.randomUUID(),
-        action,
-        createdAt: new Date().toISOString(),
-        retryCount: 0,
-      };
-      await appliedStore.setItem(entry.id, Date.now());
-      return entry;
-    } catch (err) {
-      console.warn("[PageTurn] Online execution failed, enqueuing for offline retry:", err);
+  let wasQueued = false;
+  const entry = await withQueueLock(async () => {
+    const queue = await getQueue();
+
+    // Avoid bypassing older mutations already waiting in the queue. Direct
+    // execution is safe only when it cannot overtake a pending action.
+    if (
+      queue.length === 0 &&
+      !options?.skipOnlineCheck &&
+      typeof navigator !== "undefined" &&
+      navigator.onLine
+    ) {
+      try {
+        await executeAction(queuedAction);
+        const entry: QueueEntry = {
+          id: options?.customId || crypto.randomUUID(),
+          action: queuedAction,
+          createdAt: new Date().toISOString(),
+          retryCount: 0,
+        };
+        await appliedStore.setItem(entry.id, Date.now());
+        return entry;
+      } catch (err) {
+        console.warn("[PageTurn] Online execution failed, enqueuing for offline retry:", err);
+      }
     }
+
+    const entry: QueueEntry = {
+      id: options?.customId || crypto.randomUUID(),
+      action: queuedAction,
+      createdAt: new Date().toISOString(),
+      retryCount: 0,
+    };
+
+    queue.push(entry);
+    const deduplicated = deduplicateQueue(queue);
+    await setQueue(deduplicated);
+    wasQueued = true;
+
+    return entry;
+  });
+
+  if (wasQueued && !options?.skipOnlineCheck) {
+    scheduleQueueRetry(calculateBackoffMs(0));
   }
-
-  const queue = await getQueue();
-  const entry: QueueEntry = {
-    id: options?.customId || crypto.randomUUID(),
-    action,
-    createdAt: new Date().toISOString(),
-    retryCount: 0,
-  };
-
-  queue.push(entry);
-  const deduplicated = deduplicateQueue(queue);
-  await setQueue(deduplicated);
 
   return entry;
 }
@@ -641,7 +711,27 @@ export async function enqueue(
  * - Retries transient errors up to maxRetries with backoff tracking.
  * - Discards or logs non-transient errors to prevent blocking.
  */
-export async function flushQueue(options?: FlushOptions): Promise<FlushResult> {
+export function flushQueue(options?: FlushOptions): Promise<FlushResult> {
+  return withQueueLock(async () => {
+    const result = await flushQueueLocked(options);
+    if (options?.customExecutor) return result;
+
+    if (result.retried > 0 && typeof window !== "undefined" && navigator.onLine) {
+      const entries = await getQueue();
+      const nextRetryCount = entries[0]?.retryCount || 1;
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = null;
+      scheduleQueueRetry(calculateBackoffMs(Math.max(0, nextRetryCount - 1)));
+    } else if (result.remaining === 0 && retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
+    return result;
+  });
+}
+
+async function flushQueueLocked(options?: FlushOptions): Promise<FlushResult> {
   const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRIES;
   const executor = options?.customExecutor;
 
@@ -657,7 +747,8 @@ export async function flushQueue(options?: FlushOptions): Promise<FlushResult> {
   const remaining: QueueEntry[] = [];
   const executedActions: string[] = [];
 
-  for (const entry of dedupedQueue) {
+  for (let index = 0; index < dedupedQueue.length; index++) {
+    const entry = dedupedQueue[index];
     // Idempotency check: has this action already been applied?
     const alreadyApplied = await appliedStore.getItem(entry.id);
     if (alreadyApplied) {
@@ -684,7 +775,10 @@ export async function flushQueue(options?: FlushOptions): Promise<FlushResult> {
         entry.retryCount = currentRetries;
         entry.lastError = err instanceof Error ? err.message : String(err);
         remaining.push(entry);
+        remaining.push(...dedupedQueue.slice(index + 1));
         retried++;
+        // Keep strict FIFO: later mutations must wait until this one succeeds.
+        break;
       } else {
         console.error(`[PageTurn] Dropping failed non-transient or exhausted action ${entry.id}:`, err);
         failed++;

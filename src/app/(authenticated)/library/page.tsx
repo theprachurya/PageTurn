@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -18,13 +19,17 @@ import {
   Sparkles,
 } from "lucide-react";
 import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
-import { BookUploader } from "@/components/upload/book-uploader";
 import { ShelvesSidebar } from "@/components/library/shelves-sidebar";
 import { ManageCollectionsDialog } from "@/components/library/manage-collections-dialog";
 import { EditBookMetadataDialog } from "@/components/library/edit-book-metadata-dialog";
 import { updateReadingStatus, deleteBook, type BookStatus } from "@/app/actions/library.actions";
 import { removeCachedEpub } from "@/lib/epub-cache";
 import { toast } from "@/lib/toast";
+
+const BookUploader = dynamic(
+  () => import("@/components/upload/book-uploader").then((module) => module.BookUploader),
+  { ssr: false },
+);
 
 type FilterStatus = "all" | BookStatus;
 type SortMode = "recent" | "title" | "progress";

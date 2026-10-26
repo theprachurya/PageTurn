@@ -9,8 +9,13 @@ import { EpubReader } from "@/components/reader/epub-reader";
 
 export default function ReadPage() {
   const params = useParams();
-  const router = useRouter();
   const bookId = params.bookId as string;
+
+  return <ReadBook key={bookId} bookId={bookId} />;
+}
+
+function ReadBook({ bookId }: { bookId: string }) {
+  const router = useRouter();
   const [epubUrl, setEpubUrl] = useState<string | ArrayBuffer | null>(null);
   const [initialCfi, setInitialCfi] = useState<string | null>(null);
   const [initialProgress, setInitialProgress] = useState(0);
@@ -18,19 +23,20 @@ export default function ReadPage() {
   const [loadingStatus, setLoadingStatus] = useState("Loading your book...");
   const [error, setError] = useState<string | null>(null);
 
-  const loadBook = useCallback(async () => {
+  const loadBook = useCallback(async (signal: AbortSignal) => {
     try {
       const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      if (signal.aborted) return;
       if (!user) {
-        router.push("/");
+        router.replace("/");
         return;
       }
 
       // Cache lookup and reading position are independent after authentication.
-      setLoadingStatus("Checking local cache...");
+      if (!signal.aborted) setLoadingStatus("Checking local cache...");
       const [cached, localPosition, userBookRes] = await Promise.all([
         getCachedEpub(bookId),
         getLocalReadingPosition(bookId),
@@ -39,8 +45,10 @@ export default function ReadPage() {
           .select("current_cfi, progress_percentage, last_read_at")
           .eq("user_id", user.id)
           .eq("book_id", bookId)
+          .abortSignal(signal)
           .single(),
       ]);
+      if (signal.aborted) return;
 
       const userBook = userBookRes?.data;
 
@@ -81,8 +89,10 @@ export default function ReadPage() {
           .select("epub_path")
           .eq("id", bookId)
           .eq("user_id", user.id)
+          .abortSignal(signal)
           .single();
 
+        if (signal.aborted) return;
         if (bookError || !book) {
           setError("Book not found");
           setLoading(false);
@@ -95,6 +105,7 @@ export default function ReadPage() {
           .from("epubs")
           .download(book.epub_path);
 
+        if (signal.aborted) return;
         if (downloadError || !blob) {
           setError("Could not download EPUB file");
           setLoading(false);
@@ -102,28 +113,32 @@ export default function ReadPage() {
         }
 
         arrayBuffer = await blob.arrayBuffer();
+        if (signal.aborted) return;
 
         // 4. Cache in IndexedDB for offline use
         setLoadingStatus("Caching for offline...");
         await cacheEpub(bookId, arrayBuffer);
       }
 
+      if (signal.aborted) return;
       setEpubUrl(arrayBuffer);
       setLoading(false);
     } catch {
-      setError("Failed to load book");
-      setLoading(false);
+      if (!signal.aborted) {
+        setError("Failed to load book");
+        setLoading(false);
+      }
     }
   }, [bookId, router]);
 
   useEffect(() => {
-    let ignore = false;
-    async function run() {
-      if (!ignore) await loadBook();
-    }
-    void run();
+    const controller = new AbortController();
+    const startTimer = setTimeout(() => {
+      void loadBook(controller.signal);
+    }, 0);
     return () => {
-      ignore = true;
+      clearTimeout(startTimer);
+      controller.abort();
     };
   }, [loadBook]);
 

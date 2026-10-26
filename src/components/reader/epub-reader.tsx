@@ -8,12 +8,15 @@ import {
   saveReaderSettings,
   type ReaderSettings,
 } from "@/lib/reader-settings";
-import { enqueue, initOfflineSync } from "@/lib/offline-queue";
 import {
-  getBookmarks,
-  addBookmark as addBookmarkAction,
-  removeBookmark as removeBookmarkAction,
-} from "@/app/actions/reader.actions";
+  enqueue,
+  getLocalBookmarks,
+  getQueue,
+  initOfflineSync,
+  removeLocalBookmark,
+  saveLocalBookmark,
+} from "@/lib/offline-queue";
+import { getBookmarks } from "@/app/actions/reader.actions";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ReaderToolbar, type NavItem, type BookmarkData } from "./reader-toolbar";
@@ -76,7 +79,7 @@ export function EpubReader({
   const [searchResults, setSearchResults] = useState<{ cfi: string; excerpt: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   
-  const { highlights, addHighlight, removeHighlight, updateHighlightNote } = useHighlights(bookId);
+  const { highlights, addHighlight, removeHighlight, updateHighlight } = useHighlights(bookId);
 
   // Keep a ref in sync so epub.js listeners (which close over mount-time values)
   // always see the latest highlights without requiring a full effect re-run.
@@ -99,6 +102,12 @@ export function EpubReader({
   const [syncPrompt, setSyncPrompt] = useState<{ cfi: string; date: string } | null>(null);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingProgressRef = useRef<{ cfi: string; progressPercentage: number } | null>(null);
+  const chapterRef = useRef(chapter);
+
+  useEffect(() => {
+    chapterRef.current = chapter;
+  }, [chapter]);
   
   // We still need the Supabase client for Realtime subscriptions (client-only)
   const supabase = useMemo(() => createClient(), []);
@@ -110,15 +119,67 @@ export function EpubReader({
 
   // Load Bookmarks via Server Actions
   useEffect(() => {
+    let mounted = true;
+
     async function loadData() {
-      try {
-        const bm = await getBookmarks(bookId);
-        setBookmarks(bm);
-      } catch (err) {
-        console.error("Failed to load bookmarks:", err);
+      const [remoteResult, queueResult, localResult] = await Promise.allSettled([
+        getBookmarks(bookId)
+          .then((data) => ({ data, available: true }))
+          .catch((err) => {
+            console.warn("Could not load cloud bookmarks; using local bookmarks:", err);
+            return { data: [], available: false };
+          }),
+        getQueue(),
+        getLocalBookmarks(bookId),
+      ]);
+
+      if (!mounted) return;
+      const queue = queueResult.status === "fulfilled" ? queueResult.value : [];
+      const local = localResult.status === "fulfilled" ? localResult.value : [];
+      const cloud = remoteResult.status === "fulfilled"
+        ? remoteResult.value
+        : { data: [], available: false };
+
+      const pendingAdds = new Set<string>();
+      const pendingDeletes = new Set<string>();
+      for (const entry of queue) {
+        const action = entry.action;
+        if (action.type === "addBookmark" && action.args.bookId === bookId && action.args.id) {
+          pendingAdds.add(action.args.id);
+        } else if (
+          action.type === "removeBookmark" &&
+          (!action.args.bookId || action.args.bookId === bookId)
+        ) {
+          pendingDeletes.add(action.args.id);
+        }
       }
+
+      const merged = new Map<string, BookmarkData>(
+        (cloud.available ? cloud.data : []).map((item) => [item.id, item]),
+      );
+      for (const item of local) {
+        if (!cloud.available || pendingAdds.has(item.id)) {
+          merged.set(item.id, {
+            id: item.id,
+            cfi: item.cfi,
+            label: item.label,
+            created_at: item.createdAt,
+          });
+        }
+      }
+      for (const id of pendingDeletes) merged.delete(id);
+
+      setBookmarks(
+        [...merged.values()].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        ),
+      );
     }
-    loadData();
+
+    void loadData();
+    return () => {
+      mounted = false;
+    };
   }, [bookId]);
 
   // Real-time Sync Subscription (must stay client-side)
@@ -196,10 +257,13 @@ export function EpubReader({
   // Save progress via offline queue (debounced)
   const saveProgress = useCallback((cfi: string, pct: number) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const progress = { cfi, progressPercentage: Math.min(pct, 100) };
+    pendingProgressRef.current = progress;
     saveTimerRef.current = setTimeout(async () => {
+      pendingProgressRef.current = null;
       await enqueue({
         type: "syncProgress",
-        args: { bookId, cfi, progressPercentage: Math.min(pct, 100) },
+        args: { bookId, ...progress },
       });
     }, 3000);
   }, [bookId]);
@@ -219,15 +283,18 @@ export function EpubReader({
         startTime: sessionStartRef.current.toISOString(),
         endTime: endTime.toISOString(),
         durationMinutes,
-        chapterName: chapter || null,
+        chapterName: chapterRef.current || null,
         wordsRead: sessionWordsReadRef.current,
       },
     });
-  }, [bookId, chapter]);
+  }, [bookId]);
 
   // Initialize epub.js
   useEffect(() => {
     if (!viewerRef.current) return;
+
+    sessionStartRef.current = new Date();
+    sessionWordsReadRef.current = 0;
 
     const book = ePub(epubUrl);
     bookRef.current = book;
@@ -444,9 +511,18 @@ export function EpubReader({
     document.addEventListener("keyup", keyupHandler);
 
     return () => {
-      logSession();
+      void logSession();
       document.removeEventListener("keyup", keyupHandler);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      const pendingProgress = pendingProgressRef.current;
+      pendingProgressRef.current = null;
+      if (pendingProgress) {
+        void enqueue({
+          type: "syncProgress",
+          args: { bookId, ...pendingProgress },
+        });
+      }
       rendition.destroy();
       book.destroy();
     };
@@ -520,32 +596,31 @@ export function EpubReader({
     const snapshot = bookmarks;
     const existing = snapshot.find(b => b.cfi === currentCfi);
     if (existing) {
-      // Optimistically remove immediately so UI reflects change
-      setBookmarks(prev => prev.filter(b => b.id !== existing.id));
-      try {
-        await removeBookmarkAction(existing.id);
-      } catch (err) {
-        console.error("Failed to remove bookmark:", err);
-        // Rollback on failure
-        setBookmarks(prev => [existing, ...prev]);
-      }
+      await handleDeleteBookmark(existing.id);
     } else {
+      const optimistic: BookmarkData = {
+        id: crypto.randomUUID(),
+        cfi: currentCfi,
+        label: chapter || "Bookmark",
+        created_at: new Date().toISOString(),
+      };
+      setBookmarks((prev) => [optimistic, ...prev]);
+
       try {
-        const data = await addBookmarkAction(bookId, currentCfi, chapter || "Bookmark");
-        if (data) setBookmarks(prev => [data, ...prev]);
-      } catch {
-        // If offline, queue it and add optimistically
         await enqueue({
           type: "addBookmark",
-          args: { bookId, cfi: currentCfi, label: chapter || "Bookmark" },
+          args: {
+            id: optimistic.id,
+            bookId,
+            cfi: optimistic.cfi,
+            label: optimistic.label,
+            createdAt: optimistic.created_at,
+          },
         });
-        const optimistic = {
-          id: crypto.randomUUID(),
-          cfi: currentCfi,
-          label: chapter || "Bookmark",
-          created_at: new Date().toISOString(),
-        };
-        setBookmarks(prev => [optimistic, ...prev]);
+      } catch (err) {
+        console.error("Failed to save bookmark:", err);
+        await removeLocalBookmark(optimistic.id).catch(() => undefined);
+        setBookmarks((prev) => prev.filter((bookmark) => bookmark.id !== optimistic.id));
       }
     }
   };
@@ -557,9 +632,19 @@ export function EpubReader({
     setBookmarks((current) => current.filter((item) => item.id !== bookmarkId));
 
     try {
-      await removeBookmarkAction(bookmarkId);
+      await enqueue({
+        type: "removeBookmark",
+        args: { id: bookmarkId, bookId },
+      });
     } catch (err) {
       console.error("Failed to delete bookmark:", err);
+      await saveLocalBookmark({
+        id: bookmark.id,
+        bookId,
+        cfi: bookmark.cfi,
+        label: bookmark.label,
+        createdAt: bookmark.created_at,
+      }).catch(() => undefined);
       setBookmarks((current) =>
         current.some((item) => item.id === bookmarkId) ? current : [bookmark, ...current],
       );
@@ -607,8 +692,8 @@ export function EpubReader({
   };
 
   const handleUpdateExistingHighlight = async (color: HighlightColor, note?: string) => {
-    if (activeHighlightId && note !== undefined) {
-      await updateHighlightNote(activeHighlightId, note);
+    if (activeHighlightId) {
+      await updateHighlight(activeHighlightId, { color, note });
     }
     setActiveHighlightId(null);
   };

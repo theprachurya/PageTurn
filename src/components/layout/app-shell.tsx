@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { TopNav } from "./top-nav";
 import { BottomNav } from "./bottom-nav";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { ToastContainer } from "@/components/ui/toast-container";
-import { BookUploader } from "@/components/upload/book-uploader";
 import { appEvents } from "@/lib/app-events";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+
+const BookUploader = dynamic(
+  () => import("@/components/upload/book-uploader").then((module) => module.BookUploader),
+  { ssr: false },
+);
 
 interface BookListItem {
   book_id: string;
@@ -24,6 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
   const [booksList, setBooksList] = useState<BookListItem[]>([]);
+  const booksLoadedRef = useRef(false);
 
   // Fetch book list for command palette
   const fetchBooksForPalette = useCallback(async () => {
@@ -58,6 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           }
         });
         setBooksList(list);
+        booksLoadedRef.current = true;
       }
     } catch {
       // Ignore background fetch error
@@ -65,17 +72,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let ignore = false;
-    async function init() {
-      if (!ignore) {
-        await fetchBooksForPalette();
-      }
+    if (isCommandPaletteOpen && !booksLoadedRef.current) {
+      void fetchBooksForPalette();
     }
-    void init();
-    return () => {
-      ignore = true;
-    };
-  }, [fetchBooksForPalette]);
+  }, [isCommandPaletteOpen, fetchBooksForPalette]);
 
   // Global Cmd+K / Ctrl+K shortcut listener
   useEffect(() => {

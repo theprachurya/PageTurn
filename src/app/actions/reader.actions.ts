@@ -64,17 +64,21 @@ export async function logReadingSession(
 export async function addBookmark(
   bookId: string,
   cfi: string,
-  label: string
+  label: string,
+  id?: string,
+  createdAt?: string
 ) {
   const { supabase, user } = await requireUser();
 
   const { data, error } = await supabase
     .from("bookmarks")
-    .insert({
+    .upsert({
+      ...(id ? { id } : {}),
       user_id: user.id,
       book_id: bookId,
       cfi,
       label,
+      ...(createdAt ? { created_at: createdAt } : {}),
     })
     .select()
     .single();
@@ -115,24 +119,51 @@ export async function addHighlight(
   bookId: string,
   cfiRange: string,
   color: string,
-  note: string | null
+  note: string | null,
+  id?: string,
+  text?: string,
+  createdAt?: string
 ) {
   const { supabase, user } = await requireUser();
 
   const { data, error } = await supabase
     .from("highlights")
-    .insert({
+    .upsert({
+      ...(id ? { id } : {}),
       user_id: user.id,
       book_id: bookId,
       cfi_range: cfiRange,
       color,
       note,
+      text,
+      ...(createdAt ? { created_at: createdAt } : {}),
     })
     .select()
     .single();
 
   if (error) throw new Error(`Failed to add highlight: ${error.message}`);
   return data;
+}
+
+export async function updateHighlight(
+  highlightId: string,
+  updates: { color?: string; note?: string | null }
+) {
+  const { supabase, user } = await requireUser();
+  const updateData: { color?: string; note?: string | null } = {};
+  if (updates.color !== undefined) updateData.color = updates.color;
+  if (updates.note !== undefined) updateData.note = updates.note;
+
+  if (Object.keys(updateData).length === 0) return { success: true };
+
+  const { error } = await supabase
+    .from("highlights")
+    .update(updateData)
+    .eq("id", highlightId)
+    .eq("user_id", user.id);
+
+  if (error) throw new Error(`Failed to update highlight: ${error.message}`);
+  return { success: true };
 }
 
 export async function removeHighlight(highlightId: string) {

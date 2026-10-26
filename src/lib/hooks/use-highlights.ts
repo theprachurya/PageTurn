@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   enqueue,
   getLocalHighlights,
+  getQueue,
   saveLocalHighlight,
   updateLocalHighlight,
   removeLocalHighlight,
@@ -15,9 +16,23 @@ export type Highlight = {
   cfi_range: string;
   text?: string;
   color: string;
-  note?: string;
+  note?: string | null;
   created_at: string;
 };
+
+function fromLocalHighlight(
+  highlight: Awaited<ReturnType<typeof getLocalHighlights>>[number],
+): Highlight {
+  return {
+    id: highlight.id,
+    book_id: highlight.bookId,
+    cfi_range: highlight.cfiRange,
+    color: highlight.color,
+    note: highlight.note ?? undefined,
+    text: highlight.text,
+    created_at: highlight.createdAt,
+  };
+}
 
 export function useHighlights(bookId: string) {
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -34,17 +49,7 @@ export function useHighlights(bookId: string) {
       try {
         const local = await getLocalHighlights(bookId);
         if (mounted && local.length > 0) {
-          setHighlights(
-            local.map((lh) => ({
-              id: lh.id,
-              book_id: lh.bookId,
-              cfi_range: lh.cfiRange,
-              color: lh.color,
-              note: lh.note ?? undefined,
-              text: lh.text,
-              created_at: lh.createdAt,
-            }))
-          );
+          setHighlights(local.map(fromLocalHighlight));
           setLoading(false);
         }
       } catch (err) {
@@ -77,9 +82,47 @@ export function useHighlights(bookId: string) {
         if (error) {
           console.error("Error fetching highlights:", error);
         } else if (data && mounted) {
-          setHighlights(data as Highlight[]);
-          // Sync cloud highlights to local store
+          const [queue, local] = await Promise.all([
+            getQueue(),
+            getLocalHighlights(bookId),
+          ]);
+          if (!mounted) return;
+          const pendingAdds = new Set<string>();
+          const pendingUpdates = new Set<string>();
+          const pendingDeletes = new Set<string>();
+
+          for (const entry of queue) {
+            const action = entry.action;
+            if (action.type === "addHighlight" && action.args.bookId === bookId && action.args.id) {
+              pendingAdds.add(action.args.id);
+            } else if (action.type === "updateHighlight" && action.args.bookId === bookId) {
+              pendingUpdates.add(action.args.id);
+            } else if (action.type === "deleteHighlight" && action.args.bookId === bookId) {
+              pendingDeletes.add(action.args.id);
+            }
+          }
+
+          const merged = new Map<string, Highlight>(
+            (data as Highlight[]).map((item) => [item.id, item]),
+          );
+          for (const item of local) {
+            if (pendingAdds.has(item.id) || pendingUpdates.has(item.id)) {
+              merged.set(item.id, fromLocalHighlight(item));
+            }
+          }
+          for (const id of pendingDeletes) merged.delete(id);
+
+          setHighlights(
+            [...merged.values()].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+            ),
+          );
+
+          // Refresh the offline cache without overwriting pending local edits.
           for (const item of data) {
+            if (pendingAdds.has(item.id) || pendingUpdates.has(item.id) || pendingDeletes.has(item.id)) {
+              continue;
+            }
             await saveLocalHighlight({
               id: item.id,
               bookId: item.book_id,
@@ -159,17 +202,21 @@ export function useHighlights(bookId: string) {
     [bookId]
   );
 
-  const updateHighlightNote = useCallback(
-    async (id: string, note: string) => {
+  const updateHighlight = useCallback(
+    async (id: string, updates: { color?: string; note?: string | null }) => {
+      const definedUpdates: { color?: string; note?: string | null } = {};
+      if (updates.color !== undefined) definedUpdates.color = updates.color;
+      if (updates.note !== undefined) definedUpdates.note = updates.note;
+
       setHighlights((prev) =>
-        prev.map((h) => (h.id === id ? { ...h, note } : h))
+        prev.map((h) => (h.id === id ? { ...h, ...definedUpdates } : h))
       );
 
-      await updateLocalHighlight(id, { note });
+      await updateLocalHighlight(id, definedUpdates);
 
       await enqueue({
         type: "updateHighlight",
-        args: { id, bookId, note },
+        args: { id, bookId, ...definedUpdates },
       });
     },
     [bookId]
@@ -180,6 +227,6 @@ export function useHighlights(bookId: string) {
     loading,
     addHighlight,
     removeHighlight,
-    updateHighlightNote,
+    updateHighlight,
   };
 }
