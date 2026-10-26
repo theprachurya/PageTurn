@@ -9,6 +9,8 @@ import {
   RefreshCw,
   Type,
   Upload,
+  Timer,
+  Download,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -104,26 +106,38 @@ export default function LandingPage() {
               <h3>Settle into the page</h3>
               <p>Read EPUBs with adjustable typography, precise highlights, bookmarks and a built-in dictionary.</p>
               <span className="feature-rule" />
-              <span className="feature-foot">READER · NOTES · BOOKMARKS</span>
+              <span className="feature-foot">Reader · Notes · Bookmarks</span>
             </article>
             <article id="sync" className="feature-card">
               <div className="feature-card-top"><span>02</span><RefreshCw className="h-5 w-5" /></div>
               <h3>Pick up where you left off</h3>
               <p>Reading position and annotations follow your account across devices.</p>
-              <span className="feature-foot">REALTIME SYNC</span>
+              <span className="feature-foot">Across your devices</span>
             </article>
             <article id="offline" className="feature-card">
               <div className="feature-card-top"><span>03</span><CloudOff className="h-5 w-5" /></div>
               <h3>Keep your books close</h3>
               <p>Cache EPUBs locally and keep a small queue of changes ready for reconnection.</p>
-              <span className="feature-foot">OFFLINE FIRST</span>
+              <span className="feature-foot">Available offline</span>
+            </article>
+            <article className="feature-card">
+              <div className="feature-card-top"><span>04</span><Timer className="h-5 w-5" /></div>
+              <h3>Make time for reading</h3>
+              <p>Set a 15, 25 or 45 minute focus session from the reader and settle into a chapter.</p>
+              <span className="feature-foot">Focus timer · Session tracking</span>
+            </article>
+            <article className="feature-card">
+              <div className="feature-card-top"><span>05</span><Download className="h-5 w-5" /></div>
+              <h3>Keep your annotations</h3>
+              <p>Save highlights, personal notes and bookmarks into a Markdown file you can keep or share.</p>
+              <span className="feature-foot">Portable reading notes</span>
             </article>
             <article id="analytics" className="feature-card feature-card-wide">
-              <div className="feature-card-top"><span>04</span><LineChart className="h-5 w-5" /></div>
+              <div className="feature-card-top"><span>06</span><LineChart className="h-5 w-5" /></div>
               <h3>Notice your reading rhythm</h3>
               <p>Reading sessions, history and statistics make it easier to see how a habit is taking shape.</p>
               <span className="feature-rule" />
-              <span className="feature-foot">SESSIONS · HISTORY · STATS</span>
+              <span className="feature-foot">Sessions · History · Insights</span>
             </article>
           </div>
         </section>

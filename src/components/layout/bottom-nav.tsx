@@ -17,7 +17,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="app-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#121417]/96 backdrop-blur-xl border-t border-white/[0.08] safe-area-bottom">
+    <nav className="app-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-40 border-t safe-area-bottom">
       <div className="flex items-center justify-around px-2 py-1.5">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
@@ -26,25 +26,25 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[44px] justify-center relative active:scale-95",
+                "flex flex-col items-center gap-1 px-3 py-1.5 transition-all duration-200 min-w-[56px] min-h-[48px] justify-center relative active:scale-95",
                 isActive
-                  ? "text-gold-400"
-                  : "text-zinc-500 hover:text-zinc-300"
+                  ? "text-zinc-900"
+                  : "text-zinc-500 hover:text-zinc-800"
               )}
               data-active={isActive ? "true" : undefined}
               aria-current={isActive ? "page" : undefined}
             >
-              <item.icon className={cn("w-4.5 h-4.5", isActive && "text-gold-400")} />
+              <item.icon className="w-[18px] h-[18px]" strokeWidth={1.7} />
               <span
                 className={cn(
-                  "font-mono text-[9px] uppercase tracking-[0.08em] font-medium",
-                  isActive ? "text-gold-400 font-semibold" : "text-zinc-500"
+                  "text-[10px] tracking-[0.01em] font-medium",
+                  isActive ? "text-zinc-900 font-semibold" : "text-zinc-500"
                 )}
               >
                 {item.label}
               </span>
               {isActive && (
-                <div className="bottom-nav-indicator absolute top-0 w-6 h-0.5 bg-gold-400 rounded-full" />
+              <div className="bottom-nav-indicator absolute top-0 w-7 h-0.5" />
               )}
             </Link>
           );
@@ -54,10 +54,10 @@ export function BottomNav() {
         <button
           onClick={() => appEvents.openCommandPalette()}
           aria-label="Open command search"
-          className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all duration-200 min-w-[56px] min-h-[44px] justify-center text-zinc-500 active:scale-95"
+          className="flex flex-col items-center gap-1 px-3 py-1.5 transition-all duration-200 min-w-[56px] min-h-[48px] justify-center text-zinc-500 active:scale-95"
         >
-          <Search className="w-4.5 h-4.5" />
-          <span className="font-mono text-[9px] uppercase tracking-[0.08em] font-medium">
+          <Search className="w-[18px] h-[18px]" strokeWidth={1.7} />
+          <span className="text-[10px] tracking-[0.01em] font-medium">
             Search
           </span>
         </button>

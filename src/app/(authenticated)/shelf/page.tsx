@@ -10,7 +10,6 @@ import {
   Sparkles,
   Bookmark,
   Layers,
-  Flame,
   CheckCircle2,
   Compass,
 } from "lucide-react";
@@ -253,29 +252,17 @@ export default function ShelfPage() {
                               HERO / CONTINUE READING
       ========================================================================= */}
       {latestBook ? (
-        <section className="relative rounded-2xl md:rounded-3xl border border-[#344137] bg-gradient-to-br from-[#1b241e] via-[#17201b] to-[#121a15] p-6 sm:p-8 md:p-12 overflow-hidden shadow-2xl">
-          {/* Subtle Ambient Radial Lighting */}
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#d7f36a]/[0.035] rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-[#121a15] rounded-full blur-2xl pointer-events-none" />
-
-          {/* Technical Telemetry Ribbon Header */}
+        <section className="relative rounded-xl border border-[#e4e2dc] bg-white p-6 sm:p-8 md:p-12 overflow-hidden shadow-sm">
           <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-[#344137]/60 mb-8">
             <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-[#d7f36a] animate-pulse" />
-              <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-[#d7f36a]">
-                01 // Continue Reading
-              </span>
+              <BookOpen className="h-4 w-4 text-[#355c4a]" />
+              <span className="text-sm font-medium text-[#355c4a]">Continue reading</span>
             </div>
 
-            <div className="flex items-center gap-4 text-xs font-mono text-zinc-400">
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
               <span className="inline-flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-zinc-500" />
                 {formatRelativeTime(latestBook.last_read_at)}
-              </span>
-              <span className="hidden sm:inline-block text-zinc-600">•</span>
-              <span className="hidden sm:inline-flex items-center gap-1.5 text-zinc-400">
-                <Flame className="w-3.5 h-3.5 text-[#d7f36a]/80" />
-                Active Instrument
               </span>
             </div>
           </div>
@@ -286,7 +273,7 @@ export default function ShelfPage() {
             <div className="md:col-span-4 lg:col-span-3 flex justify-center md:justify-start">
               <Link
                 href={`/read/${latestBook.book_id}`}
-                className="group relative block aspect-[2/3] w-48 sm:w-56 md:w-full max-w-[240px] rounded-xl overflow-hidden cursor-pointer transition-transform duration-500 ease-out hover:scale-[1.03] hover:-translate-y-1 shadow-[0_18px_38px_-12px_rgba(0,0,0,0.85)]"
+                className="group relative block aspect-[2/3] w-48 sm:w-56 md:w-full max-w-[240px] rounded-md overflow-hidden cursor-pointer transition-transform duration-500 ease-out hover:scale-[1.02] hover:-translate-y-1 shadow-[0_14px_28px_-16px_rgba(0,0,0,0.55)]"
                 title={`Open "${latestBook.title}"`}
               >
                 {/* Physical Book Spine Crease & Shadow Overlay */}
@@ -294,7 +281,7 @@ export default function ShelfPage() {
                 <div className="absolute inset-y-0 left-1 w-px bg-white/20 z-20 pointer-events-none" />
 
                 {/* Bookmark Ribbon hanging over top edge */}
-                <div className="absolute top-0 right-5 w-4 h-12 bg-[#d7f36a] shadow-md z-30 pointer-events-none transform transition-transform group-hover:translate-y-1">
+                <div className="absolute top-0 right-5 w-4 h-12 bg-[#355c4a] shadow-md z-30 pointer-events-none transform transition-transform group-hover:translate-y-1">
                   <div className="absolute bottom-0 left-0 right-0 h-2 bg-[#17201b] clip-ribbon-tip" />
                 </div>
 
@@ -310,12 +297,12 @@ export default function ShelfPage() {
                     className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-b from-[#202a23] to-[#17201b] flex flex-col justify-between p-5 border border-[#344137]">
+                  <div className="w-full h-full bg-[#e9eee8] flex flex-col justify-between p-5 border border-[#d8e1d8]">
                     <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
                       PageTurn Edition
                     </div>
                     <div>
-                      <BookOpen className="w-8 h-8 text-[#d7f36a] mb-3 opacity-80" />
+                      <BookOpen className="w-8 h-8 text-[#355c4a] mb-3 opacity-80" />
                       <p className="font-display font-bold text-sm text-zinc-100 line-clamp-3">
                         {latestBook.title}
                       </p>
@@ -348,17 +335,17 @@ export default function ShelfPage() {
               <div className="space-y-2.5 max-w-xl">
                 <div className="flex items-center justify-between text-xs font-mono">
                   <span className="text-zinc-400 font-medium flex items-center gap-1.5">
-                    <Bookmark className="w-3.5 h-3.5 text-[#d7f36a]" />
+                    <Bookmark className="w-3.5 h-3.5 text-[#355c4a]" />
                     Reading Progress
                   </span>
-                  <span className="font-bold text-[#d7f36a]">
+                  <span className="font-semibold text-[#355c4a]">
                     {Math.round(latestBook.progress_percentage)}% Completed
                   </span>
                 </div>
 
-                <div className="h-2 w-full rounded-full bg-zinc-900/80 border border-[#344137]/60 overflow-hidden p-0.5">
+                <div className="h-1.5 w-full rounded-full bg-[#eeede8] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#d7f36a] to-[#bfdc51] shadow-[0_0_12px_rgba(215,243,106,0.35)] transition-all duration-500"
+                    className="h-full rounded-full bg-[#355c4a] transition-all duration-500"
                     style={{ width: `${Math.max(2, Math.min(100, latestBook.progress_percentage))}%` }}
                   />
                 </div>
@@ -368,11 +355,11 @@ export default function ShelfPage() {
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Link
                   href={`/read/${latestBook.book_id}`}
-                  className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-[#d7f36a] hover:bg-[#e7f4ad] text-[#17201b] font-display font-semibold text-sm transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-[#d7f36a]/15 cursor-pointer"
+                  className="inline-flex items-center gap-2.5 px-5 py-3 rounded-md bg-[#355c4a] hover:bg-[#294c3d] text-white font-semibold text-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
                 >
-                  <BookOpen className="w-4 h-4 text-[#17201b]" />
+                  <BookOpen className="w-4 h-4 text-white" />
                   Resume Reading
-                  <ArrowRight className="w-4 h-4 text-[#17201b]" />
+                  <ArrowRight className="w-4 h-4 text-white" />
                 </Link>
 
                 <button
@@ -411,7 +398,7 @@ export default function ShelfPage() {
           </div>
         </section>
       ) : (
-        /* Purposeful Engineered Empty State */
+        /* Empty shelf */
         <section className="relative rounded-2xl md:rounded-3xl border border-[#344137] bg-[#1b241e]/60 p-10 md:p-16 text-center overflow-hidden">
           <div className="max-w-md mx-auto space-y-5">
             <div className="w-14 h-14 rounded-2xl bg-[#202a23] border border-[#344137] flex items-center justify-center mx-auto text-[#d7f36a]">
@@ -419,10 +406,10 @@ export default function ShelfPage() {
             </div>
             <div>
               <h2 className="font-display text-2xl font-bold text-white tracking-tight">
-                Your Reading Shelf is Ready
+                Your shelf is ready
               </h2>
               <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
-                Import any standard EPUB file to begin reading with typography controls, offline caching, and instant bookmark synchronization.
+                Import an EPUB to start reading. PageTurn keeps your place, notes and bookmarks ready when you return.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -431,7 +418,7 @@ export default function ShelfPage() {
                 onClick={triggerUploadModal}
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#d7f36a] hover:bg-[#e7f4ad] text-[#17201b] font-display font-semibold text-xs tracking-wide transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
               >
-                Upload EPUB Document
+                Import an EPUB
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
               <Link
@@ -447,7 +434,7 @@ export default function ShelfPage() {
       )}
 
       {/* =========================================================================
-                          SHELF OVERVIEW & TELEMETRY STRIP
+          SHELF OVERVIEW
       ========================================================================= */}
       {books.length > 0 && (
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-1">
@@ -487,17 +474,17 @@ export default function ShelfPage() {
       )}
 
       {/* =========================================================================
-                              RECENTLY READ GRID
+                          RECENTLY READ
       ========================================================================= */}
       {recentBooks.length > 0 && (
         <section className="space-y-6">
           <div className="flex items-center justify-between pb-3 border-b border-[#344137]/60">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs uppercase font-semibold text-zinc-400 tracking-[0.14em]">
-                02 // Recently Read
+              <span className="text-sm font-semibold text-zinc-700">
+                Recently read
               </span>
-              <span className="font-mono text-[11px] text-zinc-600">
-                [{recentBooks.length}]
+              <span className="text-xs text-zinc-500">
+                {recentBooks.length} {recentBooks.length === 1 ? "book" : "books"}
               </span>
             </div>
 
@@ -505,7 +492,7 @@ export default function ShelfPage() {
               href="/library"
               className="group inline-flex items-center gap-1.5 text-xs font-mono text-[#d7f36a] hover:underline"
             >
-              All Library Documents
+              View library
               <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>

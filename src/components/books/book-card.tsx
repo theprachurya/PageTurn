@@ -116,25 +116,8 @@ export function BookCard({
 
   const closeMenu = () => setMenuOpen(false);
 
-  const handleCardPointerMove = (event: React.PointerEvent<HTMLElement>) => {
-    if (event.pointerType !== "mouse" || window.matchMedia("(prefers-reduced-motion: reduce)").matches)
-      return;
-
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const x = (event.clientX - bounds.left) / bounds.width;
-    const y = (event.clientY - bounds.top) / bounds.height;
-    event.currentTarget.style.setProperty("--card-pointer-x", `${x * 100}%`);
-    event.currentTarget.style.setProperty("--card-pointer-y", `${y * 100}%`);
-    event.currentTarget.style.setProperty("--card-tilt-x", `${((0.5 - y) * 4).toFixed(2)}deg`);
-    event.currentTarget.style.setProperty("--card-tilt-y", `${((x - 0.5) * 5).toFixed(2)}deg`);
-  };
-
-  const handleCardPointerLeave = (event: React.PointerEvent<HTMLElement>) => {
+  const handleCardPointerLeave = () => {
     closeMenu();
-    event.currentTarget.style.setProperty("--card-pointer-x", "50%");
-    event.currentTarget.style.setProperty("--card-pointer-y", "35%");
-    event.currentTarget.style.setProperty("--card-tilt-x", "0deg");
-    event.currentTarget.style.setProperty("--card-tilt-y", "0deg");
   };
 
   const statusConfig = STATUS_CONFIG[book.status] || STATUS_CONFIG.reading;
@@ -218,7 +201,6 @@ export function BookCard({
   if (variant === "list") {
     return (
       <div
-        onPointerMove={handleCardPointerMove}
         onPointerLeave={handleCardPointerLeave}
         className="book-card group relative flex items-center gap-4 p-3.5 rounded-2xl bg-[#14171b] border border-white/[0.08] hover:border-gold-500/30 hover:bg-[#181c22] transition-all duration-300"
       >
@@ -306,7 +288,6 @@ export function BookCard({
   // Grid Variant
   return (
     <div
-      onPointerMove={handleCardPointerMove}
       onPointerLeave={handleCardPointerLeave}
       className="book-card group relative flex flex-col rounded-2xl bg-[#14171b] border border-white/[0.08] hover:border-gold-500/35 overflow-hidden transition-all duration-300"
     >

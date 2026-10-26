@@ -44,12 +44,14 @@ export function EpubReader({
   const totalWordsRef = useRef<number>(0);
   
   const [showToolbar, setShowToolbar] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [distractionFree, setDistractionFree] = useState(false);
   const [flipDirection, setFlipDirection] = useState<"next" | "prev" | null>(null);
   const [currentCfi, setCurrentCfi] = useState(initialCfi || "");
   const [progress, setProgress] = useState(initialProgress);
   const [chapterProgress, setChapterProgress] = useState(0);
   const [chapter, setChapter] = useState("");
+  const [bookTitle, setBookTitle] = useState("");
   const [toc, setToc] = useState<NavItem[]>([]);
   const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings());
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
@@ -228,8 +230,8 @@ export function EpubReader({
 
     const fontFamilies = {
       serif: "Georgia, 'Times New Roman', serif",
-      "sans-serif": "'Geist', system-ui, sans-serif",
-      dyslexic: "OpenDyslexic, 'Comic Sans MS', sans-serif",
+      "sans-serif": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+      dyslexic: "'Atkinson Hyperlegible', Arial, sans-serif",
     };
 
     Object.entries(themes).forEach(([name, styles]) => {
@@ -316,9 +318,9 @@ export function EpubReader({
       style.innerHTML = `
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(215, 243, 106, 0.3); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(215, 243, 106, 0.6); }
-        ::selection { background: rgba(215, 243, 106, 0.35); }
+        ::-webkit-scrollbar-thumb { background: rgba(180, 154, 107, 0.36); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(180, 154, 107, 0.65); }
+        ::selection { background: rgba(180, 154, 107, 0.3); }
         .epub-highlight { fill-opacity: 0.35 !important; mix-blend-mode: multiply; }
       `;
       contents.document.head.appendChild(style);
@@ -338,6 +340,10 @@ export function EpubReader({
       if (nav && nav.toc) {
         setToc(nav.toc as unknown as NavItem[]);
       }
+    });
+
+    book.loaded.metadata.then((metadata) => {
+      if (metadata.title?.trim()) setBookTitle(metadata.title.trim());
     });
 
     rendition.on("relocated", ((...args: unknown[]) => {
@@ -497,8 +503,13 @@ export function EpubReader({
       if (e.key === "f" || e.key === "F") {
         setDistractionFree((prev) => !prev);
       }
+      if (e.key === "?") {
+        setShowToolbar(true);
+        setShowShortcuts(true);
+      }
       if (e.key === "Escape") {
         setDistractionFree(false);
+        setShowShortcuts(false);
         setShowToolbar(false);
       }
     };
@@ -881,8 +892,8 @@ export function EpubReader({
           aria-label="Zen mode status"
           className="fixed top-4 right-4 z-40 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#17201b]/90 backdrop-blur-md border border-[#344137] text-[11px] font-mono text-zinc-300 opacity-60 hover:opacity-100 transition-opacity"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#d7f36a] animate-pulse" />
-          Zen Mode (Press F or Esc)
+          <span className="w-1.5 h-1.5 rounded-full bg-[#d7f36a]" />
+          Focus view · Press F or Esc
           <button
             type="button"
             onClick={() => setDistractionFree(false)}
@@ -917,8 +928,9 @@ export function EpubReader({
 
       {/* Reader Floating Instrument Toolbar */}
       <ReaderToolbar
-        visible={showToolbar && !distractionFree}
+        visible={(showToolbar && !distractionFree) || showShortcuts}
         chapter={chapter || "Unknown Chapter"}
+        bookTitle={bookTitle}
         progress={progress}
         chapterProgress={chapterProgress}
         toc={toc}
@@ -940,6 +952,9 @@ export function EpubReader({
         onSearch={handleSearch}
         searchResults={searchResults}
         isSearching={isSearching}
+        shortcutsOpen={showShortcuts}
+        onOpenShortcuts={() => setShowShortcuts(true)}
+        onCloseShortcuts={() => setShowShortcuts(false)}
         onClose={() => setShowToolbar(false)}
       />
 
@@ -973,7 +988,7 @@ export function EpubReader({
       {!distractionFree && (
         <div className={`h-1 ${settings.theme === "dark" ? "bg-[#121a15]" : "bg-zinc-300/60"}`}>
           <div
-            className="h-full bg-gradient-to-r from-[#d7f36a] to-[#bfdc51] shadow-[0_0_8px_rgba(215,243,106,0.35)] transition-all duration-300"
+            className="h-full bg-[#b49a6b] transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
