@@ -105,11 +105,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (isReader || event.pointerType !== "mouse" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    event.currentTarget.style.setProperty("--pointer-x", `${event.clientX}px`);
+    event.currentTarget.style.setProperty("--pointer-y", `${event.clientY}px`);
+    event.currentTarget.style.setProperty("--pointer-glow-opacity", "1");
+  };
+
+  const handlePointerLeave = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.style.setProperty("--pointer-glow-opacity", "0");
+  };
+
   return (
     <div
-      className="app-shell min-h-screen text-zinc-900 selection:bg-emerald-100 selection:text-emerald-950 antialiased"
+      className="app-shell min-h-screen bg-[#101317] text-zinc-50 selection:bg-gold-500/25 selection:text-gold-200 antialiased"
       data-reader={isReader ? "true" : undefined}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
     >
+      {!isReader && <div className="app-orbit" aria-hidden="true" />}
       {!isReader && <TopNav />}
       {!isReader && <BottomNav />}
 

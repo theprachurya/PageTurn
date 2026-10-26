@@ -333,7 +333,7 @@ export default function LibraryPage() {
           <div>
             <div className="flex items-center justify-between mb-3 px-3">
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
-                Reading status
+                01 // Views
               </p>
               {activeFiltersCount > 0 && (
                 <button
@@ -421,7 +421,7 @@ export default function LibraryPage() {
           <div>
             <div className="flex items-center justify-between mb-3 px-3">
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
-                Tags
+                02 // Tags
               </p>
               {activeTagId && (
                 <button
@@ -475,22 +475,22 @@ export default function LibraryPage() {
             <div className="flex items-center gap-2 mb-1.5">
               <span className="w-2 h-2 rounded-full bg-[#d7f36a]" />
               <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[#d7f36a]">
-                Your library
+                Document Repository
               </span>
             </div>
             <h1 className="font-display text-3xl sm:text-4xl font-bold text-white tracking-tight">
               {activeShelfId
-                ? "Shelf"
+                ? "Shelf View"
                 : statusFilter === "all"
-                ? "Library"
+                ? "Library Collection"
                 : statusFilter === "reading"
                 ? "Currently Reading"
                 : statusFilter === "plan_to_read"
                 ? "Want to Read"
-                : "Finished books"}
+                : "Finished Documents"}
             </h1>
             <p className="text-xs sm:text-sm text-zinc-400 font-mono mt-1">
-              {filteredBooks.length} {filteredBooks.length === 1 ? "book" : "books"}
+              {filteredBooks.length} {filteredBooks.length === 1 ? "document" : "documents"} indexed in personal workspace
             </p>
           </div>
 

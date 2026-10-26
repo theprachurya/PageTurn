@@ -81,8 +81,8 @@ export default function StatsPage() {
       {/* Page Header */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
         <div>
-          <h2 className="text-3xl md:text-4xl font-bold text-zinc-100 tracking-tight mb-1">Reading insights</h2>
-          <p className="text-sm text-zinc-500">A view of your reading over time.</p>
+          <h2 className="text-3xl md:text-4xl font-bold text-zinc-100 tracking-tight mb-1">Reading Analytics</h2>
+          <p className="text-sm text-zinc-500">Insights and trends for your reading journey.</p>
         </div>
         
         {/* Date Range Picker */}
@@ -101,6 +101,7 @@ export default function StatsPage() {
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
         {/* Current Streak */}
         <div className="card rounded-xl p-6 flex flex-col justify-between relative overflow-hidden group border-gold-500/20">
+          <div className="absolute -top-10 -right-10 w-28 h-28 bg-gold-500/[0.04] rounded-full blur-2xl group-hover:bg-gold-500/[0.08] transition-all duration-500"></div>
           <div className="flex items-start justify-between mb-6 relative z-10">
             <Flame className="text-gold-500 w-7 h-7" />
             <span className="flex items-center text-gold-500 text-[10px] font-semibold bg-gold-500/8 px-2 py-0.5 rounded">
@@ -118,6 +119,7 @@ export default function StatsPage() {
 
         {/* Books Completed */}
         <div className="card rounded-xl p-6 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute -top-10 -right-10 w-28 h-28 bg-emerald-500/[0.04] rounded-full blur-2xl group-hover:bg-emerald-500/[0.08] transition-all duration-500"></div>
           <div className="flex items-start justify-between mb-6 relative z-10">
             <BookOpen className="text-emerald-500 w-7 h-7" />
             <span className="flex items-center text-emerald-400 text-[10px] font-semibold bg-emerald-400/8 px-2 py-0.5 rounded">
@@ -132,6 +134,7 @@ export default function StatsPage() {
 
         {/* Words Read */}
         <div className="card rounded-xl p-6 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute -top-10 -right-10 w-28 h-28 bg-gold-500/[0.04] rounded-full blur-2xl group-hover:bg-gold-500/[0.08] transition-all duration-500"></div>
           <div className="flex items-start justify-between mb-6 relative z-10">
             <Activity className="text-gold-500 w-7 h-7" />
           </div>
@@ -145,6 +148,7 @@ export default function StatsPage() {
 
         {/* Total Time Read */}
         <div className="card rounded-xl p-6 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute -top-10 -right-10 w-28 h-28 bg-blue-500/[0.04] rounded-full blur-2xl group-hover:bg-blue-500/[0.08] transition-all duration-500"></div>
           <div className="flex items-start justify-between mb-6 relative z-10">
             <Clock className="text-blue-400 w-7 h-7" />
           </div>
@@ -180,29 +184,29 @@ export default function StatsPage() {
             {hasData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e2dc" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f23" />
                   <XAxis 
                     dataKey="name" 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: "#686a63", fontFamily: "sans-serif" }}
+                    tick={{ fontSize: 11, fill: "#52525b", fontFamily: "sans-serif" }}
                     minTickGap={20}
                   />
                   <YAxis 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: "#686a63", fontFamily: "sans-serif" }}
+                    tick={{ fontSize: 11, fill: "#52525b", fontFamily: "sans-serif" }}
                   />
                   <Tooltip 
-                    cursor={{ fill: 'rgba(53, 92, 74, 0.06)' }}
-                    contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e4e2dc', color: '#242722', boxShadow: '0 12px 24px -16px rgba(36, 39, 34, 0.24)' }}
+                    cursor={{ fill: 'rgba(212, 168, 83, 0.04)' }}
+                    contentStyle={{ backgroundColor: '#151517', borderRadius: '10px', border: '1px solid #1f1f23', color: '#fafaf9', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
                   />
                   <Bar 
                     dataKey="minutes" 
-                    fill="#355c4a"
-                    radius={[4, 4, 0, 0]}
+                    fill="#d4a853" 
+                    radius={[3, 3, 0, 0]} 
                     name="Minutes"
-                    animationDuration={450}
+                    animationDuration={1200}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -231,32 +235,32 @@ export default function StatsPage() {
             {hasData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e2dc" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f1f23" />
                   <XAxis 
                     dataKey="name" 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: "#686a63", fontFamily: "sans-serif" }}
+                    tick={{ fontSize: 11, fill: "#52525b", fontFamily: "sans-serif" }}
                     minTickGap={20}
                   />
                   <YAxis 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: "#686a63", fontFamily: "sans-serif" }}
+                    tick={{ fontSize: 11, fill: "#52525b", fontFamily: "sans-serif" }}
                   />
                   <Tooltip 
-                    cursor={{ stroke: '#9da69f', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e4e2dc', color: '#242722', boxShadow: '0 12px 24px -16px rgba(36, 39, 34, 0.24)' }}
+                    cursor={{ stroke: '#27272a', strokeWidth: 1, strokeDasharray: '5 5' }}
+                    contentStyle={{ backgroundColor: '#151517', borderRadius: '10px', border: '1px solid #1f1f23', color: '#fafaf9', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="words" 
-                    stroke="#355c4a"
-                    strokeWidth={2}
-                    dot={{ r: 3, strokeWidth: 1.5, fill: "#ffffff", stroke: "#355c4a" }}
-                    activeDot={{ r: 4.5, fill: "#355c4a", stroke: "#ffffff", strokeWidth: 2 }}
+                    stroke="#d4a853" 
+                    strokeWidth={2.5}
+                    dot={{ r: 3.5, strokeWidth: 2, fill: "#08080a", stroke: "#d4a853" }}
+                    activeDot={{ r: 5, fill: "#d4a853", stroke: "#08080a", strokeWidth: 2 }}
                     name="Words"
-                    animationDuration={450}
+                    animationDuration={1200}
                   />
                 </LineChart>
               </ResponsiveContainer>

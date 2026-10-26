@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -23,12 +23,6 @@ import {
   Maximize2,
   Minimize2,
   Sliders,
-  Download,
-  Keyboard,
-  Timer,
-  Play,
-  Pause,
-  RotateCcw,
 } from "lucide-react";
 import type { ReaderSettings } from "@/lib/reader-settings";
 import { cn } from "@/lib/utils";
@@ -63,7 +57,6 @@ interface ReaderToolbarProps {
   chapter: string;
   progress: number;
   chapterProgress?: number;
-  bookTitle?: string;
   toc: NavItem[];
   bookmarks?: BookmarkData[];
   highlights?: HighlightData[];
@@ -81,9 +74,6 @@ interface ReaderToolbarProps {
   onSearch?: (query: string) => void;
   searchResults?: { cfi: string; excerpt: string }[];
   isSearching?: boolean;
-  shortcutsOpen?: boolean;
-  onOpenShortcuts?: () => void;
-  onCloseShortcuts?: () => void;
   onClose: () => void;
 }
 
@@ -94,7 +84,6 @@ export function ReaderToolbar({
   chapter,
   progress,
   chapterProgress = 0,
-  bookTitle,
   toc,
   bookmarks = [],
   highlights = [],
@@ -112,9 +101,6 @@ export function ReaderToolbar({
   onSearch,
   searchResults = [],
   isSearching = false,
-  shortcutsOpen = false,
-  onOpenShortcuts,
-  onCloseShortcuts,
   onClose,
 }: ReaderToolbarProps) {
   const router = useRouter();
@@ -122,90 +108,6 @@ export function ReaderToolbar({
   const [showTypographyDrawer, setShowTypographyDrawer] = useState(false);
   const [activeTab, setActiveTab] = useState<"toc" | "bookmarks" | "highlights" | "search">("toc");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showFocusTimer, setShowFocusTimer] = useState(false);
-  const [focusMinutes, setFocusMinutes] = useState(25);
-  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [focusComplete, setFocusComplete] = useState(false);
-  const timerDeadlineRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!timerRunning || timerDeadlineRef.current === null) return;
-
-    const updateTimer = () => {
-      const deadline = timerDeadlineRef.current;
-      if (deadline === null) return;
-      const next = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setSecondsLeft(next);
-      if (next === 0) {
-        timerDeadlineRef.current = null;
-        setTimerRunning(false);
-        setFocusComplete(true);
-      }
-    };
-
-    updateTimer();
-    const interval = window.setInterval(updateTimer, 1000);
-    return () => window.clearInterval(interval);
-  }, [timerRunning]);
-
-  const startFocusTimer = () => {
-    const duration = secondsLeft === 0 ? focusMinutes * 60 : secondsLeft;
-    if (secondsLeft === 0) setSecondsLeft(duration);
-    setFocusComplete(false);
-    timerDeadlineRef.current = Date.now() + duration * 1000;
-    setTimerRunning(true);
-  };
-
-  const pauseFocusTimer = () => {
-    if (timerDeadlineRef.current !== null) {
-      setSecondsLeft(Math.max(0, Math.ceil((timerDeadlineRef.current - Date.now()) / 1000)));
-    }
-    timerDeadlineRef.current = null;
-    setTimerRunning(false);
-  };
-
-  const resetFocusTimer = (minutes = focusMinutes) => {
-    timerDeadlineRef.current = null;
-    setTimerRunning(false);
-    setFocusComplete(false);
-    setFocusMinutes(minutes);
-    setSecondsLeft(minutes * 60);
-  };
-
-  const exportNotes = () => {
-    const title = bookTitle?.trim() || "Reading notes";
-    const lines = [`# ${title} — reading notes`, "", `Exported from PageTurn on ${new Date().toLocaleDateString()}.`, ""];
-
-    if (highlights.length > 0) {
-      lines.push(`## Highlights (${highlights.length})`, "");
-      for (const [index, highlight] of highlights.entries()) {
-        const date = new Date(highlight.created_at).toLocaleDateString();
-        lines.push(`### Highlight ${index + 1} · ${date}`, "");
-        if (highlight.text?.trim()) lines.push(`> ${highlight.text.trim().replace(/\n/g, "\n> ")}`, "");
-        if (highlight.note?.trim()) lines.push(`**Note:** ${highlight.note.trim()}`, "");
-      }
-    }
-
-    if (bookmarks.length > 0) {
-      lines.push(`## Bookmarks (${bookmarks.length})`, "");
-      for (const bookmark of bookmarks) {
-        lines.push(`- ${bookmark.label || "Bookmark"} · ${new Date(bookmark.created_at).toLocaleDateString()}`);
-      }
-      lines.push("");
-    }
-
-    const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    const safeTitle = title.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
-    link.download = `pageturn-${safeTitle || "reading-notes"}-notes-${new Date().toISOString().slice(0, 10)}.md`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
 
   if (!visible) return null;
 
@@ -294,30 +196,6 @@ export function ReaderToolbar({
 
           {/* Right Controls: Bookmark, Zen Mode, Typography Drawer, Close */}
           <div className="flex items-center gap-1 sm:gap-1.5">
-            <button
-              type="button"
-              onClick={() => setShowFocusTimer((open) => !open)}
-              className={cn(
-                "p-2 rounded-xl transition-all cursor-pointer",
-                timerRunning || focusComplete ? "bg-[#d7f36a]/15 text-[#d7f36a]" : "hover:bg-[#202a23] text-zinc-400 hover:text-white"
-              )}
-              title="Focus timer"
-              aria-label={focusComplete ? "Focus session complete" : "Focus timer"}
-              aria-expanded={showFocusTimer}
-            >
-              <Timer className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onOpenShortcuts}
-              className="hidden sm:inline-flex p-2 rounded-xl hover:bg-[#202a23] text-zinc-400 hover:text-white transition-all cursor-pointer"
-              title="Keyboard shortcuts"
-              aria-label="Keyboard shortcuts"
-            >
-              <Keyboard className="w-4 h-4" />
-            </button>
-
             {/* Bookmark Trigger */}
             <button
               type="button"
@@ -396,71 +274,6 @@ export function ReaderToolbar({
             </button>
           </div>
         </div>
-
-        {showFocusTimer && (
-          <section
-            role="group"
-            className="pointer-events-auto absolute right-3 top-full mt-2 w-[min(19rem,calc(100vw-1.5rem))] rounded-xl border border-[#344137] bg-[#17201b] p-4 text-zinc-100 shadow-2xl"
-            aria-label="Focus timer controls"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-zinc-100">Reading focus</p>
-                <p className="mt-0.5 text-xs text-zinc-400">A quiet block for this book</p>
-              </div>
-              {focusComplete && <span className="text-xs font-medium text-[#d7f36a]">Session complete</span>}
-            </div>
-            <div className="mt-4 flex items-center gap-2" aria-label={`${Math.floor(secondsLeft / 60)} minutes ${secondsLeft % 60} seconds remaining`}>
-              <span className="font-mono text-3xl tabular-nums tracking-tight text-zinc-100">
-                {String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:{String(secondsLeft % 60).padStart(2, "0")}
-              </span>
-              <span className="text-xs text-zinc-500">remaining</span>
-            </div>
-            <div className="mt-3 h-1 overflow-hidden rounded-full bg-[#344137]">
-              <div
-                className="h-full rounded-full bg-[#d7f36a] transition-[width] duration-500"
-                style={{ width: `${Math.max(0, ((focusMinutes * 60 - secondsLeft) / (focusMinutes * 60)) * 100)}%` }}
-              />
-            </div>
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <div className="flex gap-1" aria-label="Focus duration">
-                {[15, 25, 45].map((minutes) => (
-                  <button
-                    key={minutes}
-                    type="button"
-                    onClick={() => resetFocusTimer(minutes)}
-                    disabled={timerRunning}
-                    className={cn(
-                      "rounded-md px-2.5 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                      focusMinutes === minutes ? "bg-[#d7f36a] text-[#17201b]" : "bg-[#202a23] text-zinc-300 hover:text-white"
-                    )}
-                    aria-pressed={focusMinutes === minutes}
-                  >
-                    {minutes} min
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={timerRunning ? pauseFocusTimer : startFocusTimer}
-                  className="flex h-8 w-8 items-center justify-center rounded-md bg-[#d7f36a] text-[#17201b] transition-colors hover:bg-[#e7f4ad]"
-                  aria-label={timerRunning ? "Pause focus timer" : "Start focus timer"}
-                >
-                  {timerRunning ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => resetFocusTimer()}
-                  className="flex h-8 w-8 items-center justify-center rounded-md bg-[#202a23] text-zinc-300 transition-colors hover:text-white"
-                  aria-label="Reset focus timer"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          </section>
-        )}
       </header>
 
       {/* =========================================================================
@@ -470,27 +283,9 @@ export function ReaderToolbar({
         <div className="pointer-events-auto absolute inset-y-0 left-0 w-80 sm:w-96 bg-[#17201b]/98 backdrop-blur-2xl border-r border-[#344137] text-zinc-100 shadow-2xl animate-in slide-in-from-left z-50 flex flex-col">
           <div className="p-4 border-b border-[#344137] flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="font-medium text-sm text-zinc-200">Reading tools</span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={onOpenShortcuts}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-[#202a23] hover:text-zinc-100"
-                  title="Keyboard shortcuts"
-                >
-                  <Keyboard className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Shortcuts</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={exportNotes}
-                  disabled={highlights.length === 0 && bookmarks.length === 0}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-zinc-400 transition-colors hover:bg-[#202a23] hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Export highlights, notes, and bookmarks as Markdown"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Export</span>
-                </button>
+              <span className="font-mono text-xs uppercase tracking-[0.14em] font-semibold text-zinc-400">
+                01 // Index
+              </span>
               <button
                 type="button"
                 onClick={() => setShowSidebar(false)}
@@ -498,7 +293,6 @@ export function ReaderToolbar({
               >
                 <X className="w-4 h-4" />
               </button>
-              </div>
             </div>
 
             {/* Segmented Tab Control */}
@@ -680,8 +474,8 @@ export function ReaderToolbar({
         <div className="pointer-events-auto absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 animate-slide-up">
           <div className="bg-[#17201b]/98 backdrop-blur-2xl border border-[#344137] rounded-2xl p-5 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-[#344137]">
-              <span className="text-sm font-medium text-zinc-200">
-                Appearance
+              <span className="font-mono text-xs uppercase tracking-[0.14em] font-semibold text-zinc-400">
+                Typography & Instrument Appearance
               </span>
               <button
                 type="button"
@@ -694,7 +488,7 @@ export function ReaderToolbar({
 
             {/* Reading Theme Selector */}
             <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-400">Page tone</span>
+              <span className="font-mono text-xs text-zinc-400">Canvas Surface</span>
               <div className="flex gap-2">
                 {[
                   {
@@ -736,7 +530,7 @@ export function ReaderToolbar({
 
             {/* Font Size Stepper */}
             <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-400">Text size</span>
+              <span className="font-mono text-xs text-zinc-400">Type Scale</span>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -768,12 +562,12 @@ export function ReaderToolbar({
 
             {/* Typography Font Family */}
             <div className="flex items-center justify-between">
-              <span className="text-xs text-zinc-400">Typeface</span>
+              <span className="font-mono text-xs text-zinc-400">Typeface</span>
               <div className="flex gap-2">
                 {[
                   { value: "serif" as const, label: "Serif" },
                   { value: "sans-serif" as const, label: "Sans" },
-                  { value: "dyslexic" as const, label: "Reading ease" },
+                  { value: "dyslexic" as const, label: "OpenDyslexic" },
                 ].map((font) => (
                   <button
                     key={font.value}
@@ -795,7 +589,7 @@ export function ReaderToolbar({
 
             {/* Custom Publisher CSS Override */}
             <div className="flex items-center justify-between pt-1">
-              <span className="text-xs text-zinc-400">Use publisher styling</span>
+              <span className="font-mono text-xs text-zinc-400">Standardize CSS</span>
               <button
                 type="button"
                 onClick={() =>
@@ -812,50 +606,6 @@ export function ReaderToolbar({
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {shortcutsOpen && (
-        <div className="pointer-events-auto fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm">
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reader-shortcuts-title"
-            className="w-full max-w-md rounded-2xl border border-[#344137] bg-[#17201b] p-5 text-zinc-100 shadow-2xl sm:p-6"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 id="reader-shortcuts-title" className="text-lg font-medium text-zinc-100">Keyboard shortcuts</h2>
-                <p className="mt-1 text-sm text-zinc-400">Keep your hands on the page.</p>
-              </div>
-              <button
-                type="button"
-                onClick={onCloseShortcuts}
-                className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-[#202a23] hover:text-white"
-                aria-label="Close keyboard shortcuts"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <dl className="mt-5 divide-y divide-[#344137]">
-              {[
-                { action: "Previous / next page", keys: ["←", "→"] },
-                { action: "Toggle focus view", keys: ["F"] },
-                { action: "Open shortcuts", keys: ["?"] },
-                { action: "Close toolbar or dialog", keys: ["Esc"] },
-                { action: "Search books and commands", keys: ["⌘ K", "Ctrl K"] },
-              ].map(({ action, keys }) => (
-                <div key={action} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                  <dt className="text-sm text-zinc-300">{action}</dt>
-                  <dd className="flex shrink-0 gap-1.5">
-                    {keys.map((key) => (
-                      <kbd key={key} className="rounded-md border border-[#344137] bg-[#202a23] px-2 py-1 text-xs text-zinc-200">{key}</kbd>
-                    ))}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
         </div>
       )}
     </div>
