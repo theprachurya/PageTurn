@@ -4,9 +4,9 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import ePub, { type Book, type Rendition } from "epubjs";
 import { createClient } from "@/lib/supabase/client";
 import {
-  getReaderSettings,
   saveReaderSettings,
   type ReaderSettings,
+  useReaderSettings,
 } from "@/lib/reader-settings";
 import {
   enqueue,
@@ -18,7 +18,6 @@ import {
 } from "@/lib/offline-queue";
 import { getBookmarks } from "@/app/actions/reader.actions";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { ReaderToolbar, type NavItem, type BookmarkData } from "./reader-toolbar";
 import { DictionaryPopover } from "./dictionary-popover";
 import { HighlightPopover, type HighlightColor } from "./highlight-popover";
@@ -46,29 +45,24 @@ export function EpubReader({
   const [showToolbar, setShowToolbar] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [distractionFree, setDistractionFree] = useState(false);
-  const [flipDirection, setFlipDirection] = useState<"next" | "prev" | null>(null);
   const [currentCfi, setCurrentCfi] = useState(initialCfi || "");
   const [progress, setProgress] = useState(initialProgress);
   const [chapterProgress, setChapterProgress] = useState(0);
   const [chapter, setChapter] = useState("");
   const [bookTitle, setBookTitle] = useState("");
   const [toc, setToc] = useState<NavItem[]>([]);
-  const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings());
+  const settings = useReaderSettings();
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
   const sessionWordsReadRef = useRef<number>(0);
   const wpmRef = useRef<number>(250); // Default average WPM
 
   const turnPage = useCallback((dir: "next" | "prev") => {
     if (!renditionRef.current) return;
-    setFlipDirection(dir);
     if (dir === "next") {
       renditionRef.current.next();
     } else {
       renditionRef.current.prev();
     }
-    setTimeout(() => {
-      setFlipDirection(null);
-    }, 420);
   }, []);
 
   const turnPageRef = useRef(turnPage);
@@ -212,12 +206,17 @@ export function EpubReader({
   const applySettings = useCallback((rendition: Rendition, s: ReaderSettings) => {
     const themes = {
       light: { 
-        body: { background: "#ffffff", color: "#18181b", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+        body: { background: "#fbfaf6", color: "#252722", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
         img: { "max-width": "100% !important", height: "auto !important" },
         svg: { "max-width": "100% !important", height: "auto !important" }
       },
       dark: { 
-        body: { background: "#0f0f12", color: "#f4f4f5", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+        body: { background: "#171916", color: "#e8e8e1", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+        img: { "max-width": "100% !important", height: "auto !important" },
+        svg: { "max-width": "100% !important", height: "auto !important" }
+      },
+      oled: {
+        body: { background: "#000000", color: "#ededed", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
         img: { "max-width": "100% !important", height: "auto !important" },
         svg: { "max-width": "100% !important", height: "auto !important" }
       },
@@ -240,21 +239,33 @@ export function EpubReader({
     rendition.themes.select(s.theme);
     rendition.themes.fontSize(`${s.fontSize}%`);
     rendition.themes.override("font-family", fontFamilies[s.fontFamily]);
+    const lineHeights = { compact: "1.4", comfortable: "1.7", relaxed: "1.95" };
+    rendition.themes.override("line-height", lineHeights[s.lineSpacing]);
 
     // Always override background and color so dark/sepia modes work regardless of publisher CSS
-    rendition.themes.override("background", themes[s.theme as keyof typeof themes].body.background);
-    rendition.themes.override("color", themes[s.theme as keyof typeof themes].body.color);
+    rendition.themes.override("background", themes[s.theme].body.background);
+    rendition.themes.override("color", themes[s.theme].body.color);
 
     if (s.disablePublisherCSS) {
-      rendition.themes.override("line-height", "1.6");
       rendition.themes.override("text-align", "left");
       rendition.themes.override("padding", "2rem 5%");
     } else {
-      rendition.themes.override("line-height", "inherit");
       rendition.themes.override("text-align", "inherit");
       rendition.themes.override("padding", "inherit");
     }
   }, []);
+
+  useEffect(() => {
+    const rendition = renditionRef.current;
+    if (!rendition) return;
+    applySettings(rendition, settings);
+  }, [settings, applySettings]);
+
+  useEffect(() => {
+    const rendition = renditionRef.current;
+    if (!rendition) return;
+    (rendition as unknown as { flow: (flow: string) => void }).flow(settings.readingMode === "paged" ? "paginated" : "scrolled-doc");
+  }, [settings.readingMode]);
 
   // Save progress via offline queue (debounced)
   const saveProgress = useCallback((cfi: string, pct: number) => {
@@ -304,9 +315,9 @@ export function EpubReader({
     const rendition = book.renderTo(viewerRef.current, {
       width: "100%",
       height: "100%",
-      flow: "scrolled-doc",
+      flow: settings.readingMode === "paged" ? "paginated" : "scrolled-doc",
       spread: "none",
-      manager: "continuous",
+      manager: "default",
     });
 
     renditionRef.current = rendition;
@@ -541,13 +552,7 @@ export function EpubReader({
   }, [epubUrl]);
 
   const updateSettings = (newSettings: Partial<ReaderSettings>) => {
-    const updated = { ...settings, ...newSettings };
-    setSettings(updated);
     saveReaderSettings(newSettings);
-    
-    if (renditionRef.current) {
-      applySettings(renditionRef.current, updated);
-    }
   };
 
   const navigateTo = (href: string) => { renditionRef.current?.display(href); setSelection(null); };
@@ -728,7 +733,8 @@ export function EpubReader({
     try {
       const book = bookRef.current;
       const results: { cfi: string; excerpt: string }[] = [];
-      const q = query.toLowerCase();
+      const q = query.trim().toLocaleLowerCase();
+      if (!q) return;
 
       const bookWithSpine = book as unknown as {
         spine?: {
@@ -736,29 +742,42 @@ export function EpubReader({
             load: (fn: unknown) => Promise<void>;
             document: Document;
             cfiFromElement: (el: Element) => string;
+            cfiFromRange: (range: Range) => string;
             unload: () => void;
           }>;
         };
       };
 
       for (const item of bookWithSpine.spine?.spineItems || []) {
+        if (results.length >= 50) break;
         await item.load(book.load.bind(book));
-        const text = item.document.body.textContent?.toLowerCase() || "";
+        const fullText = item.document.body.textContent || "";
+        const text = fullText.toLocaleLowerCase();
         
         let idx = text.indexOf(q);
-        while (idx !== -1) {
+        while (idx !== -1 && results.length < 50) {
           const start = Math.max(0, idx - 40);
-          const end = Math.min(text.length, idx + q.length + 40);
-          let excerpt = item.document.body.textContent?.substring(start, end) || "";
-          const matchRegex = new RegExp(query, 'gi');
-          excerpt = excerpt.replace(matchRegex, (match: string) => `<strong class="text-purple-400">${match}</strong>`);
-          
-          const cfi = item.cfiFromElement(item.document.body);
-          
-          results.push({ cfi, excerpt: `...${excerpt}...` });
-          
+          const end = Math.min(fullText.length, idx + q.length + 40);
+          const excerpt = `${start > 0 ? "…" : ""}${fullText.slice(start, end)}${end < fullText.length ? "…" : ""}`;
+          let cfi = item.cfiFromElement(item.document.body);
+          const walker = item.document.createTreeWalker(item.document.body, NodeFilter.SHOW_TEXT);
+          let textNode = walker.nextNode();
+          let nodeStart = 0;
+          while (textNode) {
+            const nodeText = textNode.textContent || "";
+            const nodeOffset = idx - nodeStart;
+            if (nodeOffset >= 0 && nodeOffset + q.length <= nodeText.length && nodeText.slice(nodeOffset, nodeOffset + q.length).toLocaleLowerCase() === q) {
+              const range = item.document.createRange();
+              range.setStart(textNode, nodeOffset);
+              range.setEnd(textNode, nodeOffset + q.length);
+              cfi = item.cfiFromRange(range);
+              break;
+            }
+            nodeStart += nodeText.length;
+            textNode = walker.nextNode();
+          }
+          results.push({ cfi, excerpt });
           idx = text.indexOf(q, idx + q.length);
-          if (results.length > 50) break;
         }
         item.unload();
       }
@@ -817,9 +836,10 @@ export function EpubReader({
   }, []);
 
   const bgColors = {
-    light: "bg-[#f5f2eb]",
-    dark: "bg-[#101317]",
+    light: "bg-[#f4f2ed]",
+    dark: "bg-[#171916]",
     sepia: "bg-[#ede8db]",
+    oled: "bg-black",
   };
   const isBookmarked = bookmarks.some((b) => b.cfi === currentCfi);
 
@@ -962,19 +982,8 @@ export function EpubReader({
       <div className="reader-canvas-wrapper flex-1 overflow-hidden flex justify-center items-center w-full px-2 sm:px-6 py-2 sm:py-5">
         <div
           data-reader-theme={settings.theme}
-          className={cn(
-            "reader-book-canvas relative w-full max-w-4xl h-full flex flex-col overflow-hidden",
-            flipDirection === "next" && "page-turn-anim-next",
-            flipDirection === "prev" && "page-turn-anim-prev"
-          )}
+          className="reader-book-canvas relative w-full max-w-4xl h-full flex flex-col overflow-hidden"
         >
-          {/* Realistic Paper Page Deckle Edge */}
-          <div className="reader-page-edge pointer-events-none" />
-
-          {/* 3D Paper Curl Shadow Sweep on Turn */}
-          {flipDirection === "next" && <div className="paper-shadow-sweep-next" />}
-          {flipDirection === "prev" && <div className="paper-shadow-sweep-prev" />}
-
           {/* EPUB Viewer Surface */}
           <div
             ref={viewerRef}
@@ -986,7 +995,7 @@ export function EpubReader({
 
       {/* Ambient Reading Progress Bar */}
       {!distractionFree && (
-        <div className={`h-1 ${settings.theme === "dark" ? "bg-[#121a15]" : "bg-zinc-300/60"}`}>
+        <div data-reader-theme={settings.theme} className={`h-1 ${settings.theme === "dark" || settings.theme === "oled" ? "bg-[#121a15]" : "bg-zinc-300/60"}`}>
           <div
             className="h-full bg-[#b49a6b] transition-all duration-300"
             style={{ width: `${progress}%` }}

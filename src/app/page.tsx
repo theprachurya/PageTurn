@@ -11,6 +11,8 @@ import {
   Upload,
   Timer,
   Download,
+  NotebookPen,
+  PanelTop,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -25,12 +27,12 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#17201b] font-sans text-zinc-50 antialiased selection:bg-gold-500/20 selection:text-gold-200 app-landing">
-      <nav className="landing-nav fixed top-0 z-50 w-full border-b border-white/10 bg-[#17201b]/95">
+    <div className="min-h-screen overflow-x-hidden bg-[#f7f6f2] font-sans text-[#262922] antialiased app-landing">
+      <nav className="landing-nav fixed top-0 z-50 w-full border-b bg-[#faf9f6]/90">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-4 sm:px-8">
           <a href="#top" className="flex items-center gap-2.5" aria-label="PageTurn home">
             <span className="brand-mark"><BookOpen className="h-4 w-4" /></span>
-            <span className="text-lg font-semibold tracking-tight text-zinc-100">
+            <span className="text-lg font-semibold tracking-tight text-[#262922]">
               Page<span className="text-gold-500">Turn</span>
             </span>
           </a>
@@ -53,8 +55,8 @@ export default function LandingPage() {
               Keep your place in <em>every book.</em>
             </h1>
             <p className="landing-lede">
-              Your books, notes, shelves and reading sessions stay together. Read offline,
-              then pick up where you left off on another device.
+              A considered place for your EPUBs, annotations and reading time. Keep your place,
+              make useful notes, and return to the page from any device.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <button onClick={handleSignIn} className="landing-primary">
@@ -68,7 +70,7 @@ export default function LandingPage() {
           </div>
 
           <div className="book-stage" aria-hidden="true">
-            <div className="book-stage-label"><span>PageTurn · Reader view</span><span>01 / 04</span></div>
+            <div className="book-stage-label"><span>PageTurn · Reading view</span><span>Chapter 04</span></div>
             <div className="book-composition">
               <div className="cover-back cover-back-one" />
               <div className="cover-back cover-back-two" />
@@ -88,7 +90,7 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            <div className="book-stage-foot"><span>Progress saved</span><span className="sync-mark"><i /> Ready to read offline</span></div>
+            <div className="book-stage-foot"><span>43% complete</span><span className="sync-mark"><i /> Available offline</span></div>
           </div>
         </section>
 
@@ -132,22 +134,34 @@ export default function LandingPage() {
               <p>Save highlights, personal notes and bookmarks into a Markdown file you can keep or share.</p>
               <span className="feature-foot">Portable reading notes</span>
             </article>
+            <article id="notebook" className="feature-card">
+              <div className="feature-card-top"><span>06</span><NotebookPen className="h-5 w-5" /></div>
+              <h3>Build a notebook that travels</h3>
+              <p>Search highlights, bookmarks and personal notes across your entire library, then export them as Markdown.</p>
+              <span className="feature-foot">Cross-book notes · Portable export</span>
+            </article>
             <article id="analytics" className="feature-card feature-card-wide">
-              <div className="feature-card-top"><span>06</span><LineChart className="h-5 w-5" /></div>
+              <div className="feature-card-top"><span>07</span><LineChart className="h-5 w-5" /></div>
               <h3>Notice your reading rhythm</h3>
               <p>Reading sessions, history and statistics make it easier to see how a habit is taking shape.</p>
               <span className="feature-rule" />
               <span className="feature-foot">Sessions · History · Insights</span>
             </article>
+            <article className="feature-card">
+              <div className="feature-card-top"><span>08</span><PanelTop className="h-5 w-5" /></div>
+              <h3>Choose how the page moves</h3>
+              <p>Switch between page-by-page and continuous reading, tune line spacing, or choose a paper, dark or OLED view.</p>
+              <span className="feature-foot">Paginated · Scroll · OLED</span>
+            </article>
           </div>
         </section>
       </main>
 
-      <footer className="landing-footer border-t border-white/10">
+      <footer className="landing-footer border-t">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 px-5 py-7 sm:flex-row sm:items-center sm:px-8">
           <div className="flex items-center gap-2.5">
             <BookOpen className="h-4 w-4 text-gold-500" />
-            <span className="text-sm font-semibold text-zinc-300">PageTurn</span>
+            <span className="text-sm font-semibold text-[#42443e]">PageTurn</span>
           </div>
           <a className="landing-nav-link" href="#top">Back to the beginning ↑</a>
           <span className="text-xs text-zinc-500">© {new Date().getFullYear()} PageTurn</span>

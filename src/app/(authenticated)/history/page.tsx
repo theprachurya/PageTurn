@@ -48,7 +48,10 @@ export default function HistoryPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user || ignore) return;
+      if (!user || ignore) {
+        if (!ignore) setLoading(false);
+        return;
+      }
 
       const [
         profileResult,

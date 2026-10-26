@@ -42,7 +42,7 @@ function ReadBook({ bookId }: { bookId: string }) {
         getLocalReadingPosition(bookId),
         supabase
           .from("user_books")
-          .select("current_cfi, progress_percentage, last_read_at")
+          .select("current_cfi, progress_percentage, last_read_at, status")
           .eq("user_id", user.id)
           .eq("book_id", bookId)
           .abortSignal(signal)
@@ -51,6 +51,11 @@ function ReadBook({ bookId }: { bookId: string }) {
       if (signal.aborted) return;
 
       const userBook = userBookRes?.data;
+      const requestedCfi = new URLSearchParams(window.location.search).get("cfi");
+
+      if (userBook?.status === "plan_to_read") {
+        await supabase.from("user_books").update({ status: "reading" }).eq("user_id", user.id).eq("book_id", bookId);
+      }
 
       if (userBook && localPosition) {
         // Resolve between local and remote using Last-Write-Wins
@@ -75,6 +80,7 @@ function ReadBook({ bookId }: { bookId: string }) {
         setInitialCfi(userBook.current_cfi);
         setInitialProgress(Number(userBook.progress_percentage) || 0);
       }
+      if (requestedCfi) setInitialCfi(requestedCfi);
 
       let arrayBuffer: ArrayBuffer;
 
