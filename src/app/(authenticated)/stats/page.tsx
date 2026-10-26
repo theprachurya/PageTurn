@@ -19,8 +19,6 @@ export default function StatsPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<StatsRange>("30");
-  const [reloadKey, setReloadKey] = useState(0);
-  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,20 +26,16 @@ export default function StatsPage() {
     async function loadStats() {
       try {
         const data = await getStats(range);
-        if (!cancelled) {
-          setStats(data);
-          setLoadError(false);
-        }
+        if (!cancelled) setStats(data);
       } catch (err) {
         console.error("Failed to load stats", err);
-        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     loadStats();
     return () => { cancelled = true; };
-  }, [range, reloadKey]);
+  }, [range]);
 
   if (loading) {
     return (
@@ -52,17 +46,7 @@ export default function StatsPage() {
     );
   }
 
-  if (!stats) {
-    return (
-      <div className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center px-5 text-center">
-        <p className="text-base font-semibold">{loadError ? "Insights couldn’t be loaded." : "Gathering your reading history…"}</p>
-        {loadError && <>
-          <p className="mt-2 text-sm text-zinc-500">Your books and notes are safe. Try again in a moment.</p>
-          <button type="button" className="today-primary mt-5" onClick={() => { setLoading(true); setLoadError(false); setReloadKey((key) => key + 1); }}>Try again</button>
-        </>}
-      </div>
-    );
-  }
+  if (!stats) return null;
 
   const formatDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split("-").map(Number);
@@ -104,7 +88,7 @@ export default function StatsPage() {
         {/* Date Range Picker */}
         <div className="flex items-center gap-3 bg-[#111113] border border-[#1f1f23] rounded-lg px-4 py-2">
           <CalendarDays className="w-4 h-4 text-zinc-500" />
-          <select aria-label="Chart date range" value={range} onChange={(event) => { setLoading(true); setStats(null); setLoadError(false); setRange(event.target.value as StatsRange); }} className="bg-transparent border-none text-zinc-300 text-sm font-medium focus:ring-0 focus:outline-none cursor-pointer pr-4">
+          <select aria-label="Chart date range" value={range} onChange={(event) => setRange(event.target.value as StatsRange)} className="bg-transparent border-none text-zinc-300 text-sm font-medium focus:ring-0 focus:outline-none cursor-pointer pr-4">
             <option className="bg-zinc-900" value="30">Last 30 Days</option>
             <option className="bg-zinc-900" value="90">Last 90 Days</option>
             <option className="bg-zinc-900" value="year">This Year</option>

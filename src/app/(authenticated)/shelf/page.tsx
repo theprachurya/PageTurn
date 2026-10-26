@@ -1,257 +1,538 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ArrowRight,
   BookOpen,
-  Check,
-  ChevronRight,
-  Clock3,
-  Layers3,
-  NotebookPen,
-  Plus,
+  ArrowRight,
+  Clock,
   Sparkles,
+  Bookmark,
+  Layers,
+  CheckCircle2,
+  Compass,
 } from "lucide-react";
-import { type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
-import { updateReadingStatus, type BookStatus } from "@/app/actions/library.actions";
+import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
+import { updateReadingStatus, deleteBook, type BookStatus } from "@/app/actions/library.actions";
+import { removeCachedEpub } from "@/lib/epub-cache";
 import { ManageCollectionsDialog } from "@/components/library/manage-collections-dialog";
 import { triggerUploadModal } from "@/lib/app-events";
 import { toast } from "@/lib/toast";
 
 function formatRelativeTime(dateStr: string | null): string {
   if (!dateStr) return "Not started";
-  const diffMs = Math.max(0, Date.now() - new Date(dateStr).getTime());
-  const diffMin = Math.floor(diffMs / 60_000);
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
   const diffHours = Math.floor(diffMin / 60);
   const diffDays = Math.floor(diffHours / 24);
+
   if (diffMin < 2) return "Just now";
-  if (diffMin < 60) return `${diffMin} min ago`;
-  if (diffHours < 24) return `${diffHours} hr ago`;
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default function ShelfPage() {
-  const router = useRouter();
   const [books, setBooks] = useState<BookData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [managing, setManaging] = useState<{ id: string; title: string; tags: BookTag[]; shelves: BookShelf[] } | null>(null);
+  const [managingCollectionsForBook, setManagingCollectionsForBook] = useState<{
+    id: string;
+    title: string;
+    tags: BookTag[];
+    shelves: BookShelf[];
+  } | null>(null);
 
-  const fetchBooks = useCallback(async (): Promise<BookData[]> => {
+  const fetchBooks = useCallback(async () => {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const [ubResult, tagsResult, shelvesResult] = await Promise.all([
-      supabase.from("user_books").select("id, book_id, status, current_cfi, progress_percentage, last_read_at, books (id, title, author, description, cover_url)").eq("user_id", user.id).order("last_read_at", { ascending: false }),
-      supabase.from("book_tags").select("book_id, tags (id, name, color)").eq("user_id", user.id),
-      supabase.from("shelf_books").select("book_id, shelves (id, name)").eq("user_id", user.id),
+      supabase
+        .from("user_books")
+        .select(`
+          id, book_id, status, current_cfi, progress_percentage, last_read_at,
+          books (id, title, author, description, cover_url)
+        `)
+        .eq("user_id", user.id)
+        .order("last_read_at", { ascending: false }),
+      supabase
+        .from("book_tags")
+        .select(`
+          book_id,
+          tags (id, name, color)
+        `)
+        .eq("user_id", user.id),
+      supabase
+        .from("shelf_books")
+        .select(`
+          book_id,
+          shelves (id, name)
+        `)
+        .eq("user_id", user.id),
     ]);
-    if (ubResult.error) throw ubResult.error;
 
-    const tagsByBook = new Map<string, BookTag[]>();
-    for (const row of tagsResult.data || []) {
-      const tag = row.tags as unknown as BookTag | null;
-      if (tag) tagsByBook.set(row.book_id, [...(tagsByBook.get(row.book_id) || []), tag]);
-    }
-    const shelvesByBook = new Map<string, BookShelf[]>();
-    for (const row of shelvesResult.data || []) {
-      const shelf = row.shelves as unknown as BookShelf | null;
-      if (shelf) shelvesByBook.set(row.book_id, [...(shelvesByBook.get(row.book_id) || []), shelf]);
-    }
+    const ubData = ubResult.data;
+    const tagsData = tagsResult.data;
+    const shelvesData = shelvesResult.data;
 
-    const rows = (ubResult.data || []) as unknown as Array<{
-      id: string;
-      book_id: string;
-      status: string | null;
-      current_cfi: string | null;
-      progress_percentage: number | string | null;
-      last_read_at: string | null;
-      books: { title?: string | null; author?: string | null; description?: string | null; cover_url?: string | null } | null;
-    }>;
-    return rows.map((row) => {
-      const book = row.books;
-      return {
-        id: row.id,
-        book_id: row.book_id,
-        title: book?.title || "Untitled book",
-        author: book?.author || null,
-        description: book?.description || null,
-        cover_url: book?.cover_url || null,
-        progress_percentage: Number(row.progress_percentage) || 0,
-        current_cfi: row.current_cfi || null,
-        last_read_at: row.last_read_at || null,
-        status: (row.status || "reading") as BookStatus,
-        tags: tagsByBook.get(row.book_id) || [],
-        shelves: shelvesByBook.get(row.book_id) || [],
-      } satisfies BookData;
-    });
+    if (ubData) {
+      const tagsByBook = new Map<string, BookTag[]>();
+      for (const row of tagsData || []) {
+        const tag = row.tags as unknown as BookTag | null;
+        if (!tag) continue;
+        const list = tagsByBook.get(row.book_id);
+        if (list) list.push(tag);
+        else tagsByBook.set(row.book_id, [tag]);
+      }
+
+      const shelvesByBook = new Map<string, BookShelf[]>();
+      for (const row of shelvesData || []) {
+        const shelf = row.shelves as unknown as BookShelf | null;
+        if (!shelf) continue;
+        const list = shelvesByBook.get(row.book_id);
+        if (list) list.push(shelf);
+        else shelvesByBook.set(row.book_id, [shelf]);
+      }
+
+      const mapped = (
+        ubData as unknown as Array<{
+          id: string;
+          book_id: string;
+          progress_percentage: number | null;
+          current_cfi: string | null;
+          last_read_at: string | null;
+          status: BookStatus | null;
+          books: {
+            title?: string | null;
+            author?: string | null;
+            description?: string | null;
+            cover_url?: string | null;
+          } | null;
+        }>
+      ).map((ub) => {
+        const book = ub.books;
+
+        return {
+          id: ub.id,
+          book_id: ub.book_id,
+          title: book?.title || "Unknown",
+          author: book?.author || null,
+          description: book?.description || null,
+          cover_url: book?.cover_url || null,
+          progress_percentage: Number(ub.progress_percentage) || 0,
+          current_cfi: ub.current_cfi || null,
+          last_read_at: ub.last_read_at || null,
+          status: ub.status || "reading",
+          tags: tagsByBook.get(ub.book_id) || [],
+          shelves: shelvesByBook.get(ub.book_id) || [],
+        };
+      });
+      setBooks(mapped);
+    }
+    setLoading(false);
   }, []);
 
-  const refreshBooks = useCallback(async () => {
-    try {
-      setBooks(await fetchBooks());
-    } catch (error) {
-      console.error("Failed to load your reading desk", error);
-      toast.error("Your books could not be loaded");
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchBooks]);
-
   useEffect(() => {
-    let active = true;
-    fetchBooks().then((result) => {
-      if (active) setBooks(result);
-    }).catch((error: unknown) => {
-      console.error("Failed to load your reading desk", error);
-      if (active) toast.error("Your books could not be loaded");
-    }).finally(() => {
-      if (active) setLoading(false);
-    });
-    return () => { active = false; };
+    let ignore = false;
+    async function load() {
+      if (!ignore) {
+        await fetchBooks();
+      }
+    }
+    void load();
+    return () => {
+      ignore = true;
+    };
   }, [fetchBooks]);
 
-  const readingBooks = useMemo(() => books.filter((book) => book.status === "reading"), [books]);
-  const activeBook = readingBooks.find((book) => book.last_read_at) || readingBooks[0] || null;
-  const queue = useMemo(() => books.filter((book) => book.status === "plan_to_read").slice(0, 4), [books]);
-  const otherReading = useMemo(() => readingBooks.filter((book) => book.book_id !== activeBook?.book_id), [readingBooks, activeBook]);
-  const completedCount = useMemo(() => books.filter((book) => book.status === "completed").length, [books]);
-
-  const moveToStatus = async (book: BookData, status: BookStatus): Promise<boolean> => {
+  const handleUpdateStatus = async (bookId: string, newStatus: BookStatus) => {
     try {
-      await updateReadingStatus(book.book_id, status);
-      setBooks((current) => current.map((item) => item.book_id === book.book_id
-        ? { ...item, status, progress_percentage: status === "completed" ? 100 : status === "plan_to_read" ? 0 : item.progress_percentage, current_cfi: status === "plan_to_read" ? null : item.current_cfi }
-        : item));
-      toast.success(status === "reading" ? "Added to your reading list" : status === "completed" ? "Marked as finished" : "Moved to your queue");
-      return true;
-    } catch (error) {
-      console.error("Could not update reading status", error);
-      toast.error("The book status could not be updated");
-      return false;
+      await updateReadingStatus(bookId, newStatus);
+      setBooks((prev) =>
+        prev.map((b) => {
+          if (b.book_id === bookId) {
+            return {
+              ...b,
+              status: newStatus,
+              progress_percentage:
+                newStatus === "completed"
+                  ? 100
+                  : newStatus === "plan_to_read"
+                  ? 0
+                  : b.progress_percentage,
+            };
+          }
+          return b;
+        })
+      );
+      toast.success(
+        `Moved to ${
+          newStatus === "completed"
+            ? "Completed"
+            : newStatus === "plan_to_read"
+            ? "Want to Read"
+            : "Currently Reading"
+        }`
+      );
+    } catch (err) {
+      console.error("Failed to update status", err);
+      toast.error("Failed to update status");
+      fetchBooks();
     }
   };
 
+  const handleDelete = async (bookId: string) => {
+    if (!confirm("Are you sure you want to remove this book from your library?")) return;
+    try {
+      await deleteBook(bookId);
+      await removeCachedEpub(bookId);
+      toast.success("Document removed");
+      fetchBooks();
+    } catch (err) {
+      console.error("Failed to delete book", err);
+      toast.error("Failed to delete document");
+      fetchBooks();
+    }
+  };
+
+  const latestBook = books[0];
+  const recentBooks = books.slice(1, 11);
+
+  // Stats for the telemetry bar
+  const stats = useMemo(() => {
+    const reading = books.filter((b) => b.status === "reading").length;
+    const completed = books.filter((b) => b.status === "completed").length;
+    const wantToRead = books.filter((b) => b.status === "plan_to_read").length;
+    return { reading, completed, wantToRead, total: books.length };
+  }, [books]);
+
   if (loading) {
-    return <div className="today-page mx-auto max-w-6xl px-5 py-10 md:px-10">
-      <div className="h-3 w-24 animate-pulse rounded bg-zinc-200" />
-      <div className="mt-4 h-10 w-64 max-w-full animate-pulse rounded bg-zinc-200" />
-      <div className="mt-9 h-64 animate-pulse rounded-2xl bg-zinc-200" />
-      <div className="mt-8 grid gap-4 sm:grid-cols-2"><div className="h-56 animate-pulse rounded-xl bg-zinc-200" /><div className="h-56 animate-pulse rounded-xl bg-zinc-200" /></div>
-    </div>;
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10 animate-fade-in">
+        {/* Skeleton Continue Reading Hero */}
+        <div className="p-8 md:p-12 rounded-2xl bg-[#1b241e]/50 border border-[#344137] flex flex-col md:flex-row gap-8 items-center animate-pulse">
+          <div className="w-44 md:w-56 aspect-[2/3] rounded-xl bg-zinc-800/40" />
+          <div className="flex-1 space-y-4 w-full">
+            <div className="h-4 w-32 bg-zinc-800/40 rounded-full" />
+            <div className="h-10 w-3/4 bg-zinc-800/40 rounded-lg" />
+            <div className="h-4 w-1/3 bg-zinc-800/40 rounded-full" />
+            <div className="h-2 w-full bg-zinc-800/40 rounded-full mt-6" />
+            <div className="h-12 w-48 bg-zinc-800/40 rounded-xl mt-6" />
+          </div>
+        </div>
+
+        {/* Skeleton Grid */}
+        <div className="space-y-4">
+          <div className="h-5 w-40 bg-zinc-800/40 rounded-full" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="aspect-[2/3] rounded-xl bg-zinc-800/30 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="today-page mx-auto max-w-6xl px-5 py-8 md:px-10 md:py-10">
-      <header className="today-heading mb-8 flex flex-wrap items-end justify-between gap-5">
-        <div>
-          <p className="today-eyebrow">Your reading desk</p>
-          <h1 className="mt-2 text-[32px] font-semibold leading-tight sm:text-[38px]">A good place to pick up.</h1>
-          <p className="mt-2 max-w-lg text-sm leading-6 text-zinc-500">Your books, thoughts and reading rhythm—ready when you are.</p>
-        </div>
-        <button type="button" onClick={triggerUploadModal} className="today-import"><Plus className="h-4 w-4" /> Add a book</button>
-      </header>
-
-      {activeBook ? (
-        <section className="today-resume overflow-hidden rounded-2xl border bg-white">
-          <div className="today-resume-copy flex flex-col justify-center p-6 sm:p-9 lg:p-11">
-            <div className="mb-7 flex items-center gap-2 text-xs font-medium text-[#496b55]"><BookOpen className="h-4 w-4" /> Pick up where you left off</div>
-            <p className="mb-2 text-[11px] font-medium text-zinc-500">Last opened {formatRelativeTime(activeBook.last_read_at)}</p>
-            <h2 className="max-w-xl text-2xl font-semibold leading-tight sm:text-3xl">{activeBook.title}</h2>
-            <p className="mt-2 text-sm text-zinc-500">{activeBook.author || "Author not listed"}</p>
-            {activeBook.description && <p className="mt-5 line-clamp-2 max-w-xl text-sm leading-6 text-zinc-500">{activeBook.description}</p>}
-            <div className="mt-7 max-w-md">
-              <div className="mb-2 flex items-center justify-between text-xs text-zinc-500"><span>Reading progress</span><span className="font-medium text-zinc-700">{Math.round(activeBook.progress_percentage)}%</span></div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-[#eeede8]"><div className="h-full rounded-full bg-[#5b7961] transition-[width] duration-700" style={{ width: `${Math.max(0, Math.min(100, activeBook.progress_percentage))}%` }} /></div>
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-12">
+      {/* =========================================================================
+                              HERO / CONTINUE READING
+      ========================================================================= */}
+      {latestBook ? (
+        <section className="relative rounded-xl border border-[#e4e2dc] bg-white p-6 sm:p-8 md:p-12 overflow-hidden shadow-sm">
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-[#344137]/60 mb-8">
+            <div className="flex items-center gap-2.5">
+              <BookOpen className="h-4 w-4 text-[#355c4a]" />
+              <span className="text-sm font-medium text-[#355c4a]">Continue reading</span>
             </div>
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-              <Link href={`/read/${activeBook.book_id}`} className="today-primary">Resume reading <ArrowRight className="h-4 w-4" /></Link>
-              <button type="button" onClick={() => setManaging({ id: activeBook.book_id, title: activeBook.title, tags: activeBook.tags || [], shelves: activeBook.shelves || [] })} className="today-secondary"><Layers3 className="h-4 w-4" /> Organize</button>
-              <button type="button" onClick={() => void moveToStatus(activeBook, "completed")} className="today-secondary"><Check className="h-4 w-4" /> Mark finished</button>
+
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                {formatRelativeTime(latestBook.last_read_at)}
+              </span>
             </div>
           </div>
-          <Link href={`/read/${activeBook.book_id}`} className="today-cover-panel" aria-label={`Resume ${activeBook.title}`}>
-            {activeBook.cover_url ? (
-              /* eslint-disable-next-line @next/next/no-img-element -- Cover URLs are user-scoped storage URLs and are not allowlisted for Next image optimization. */
-              <img src={activeBook.cover_url} alt="" loading="eager" fetchPriority="high" decoding="async" />
-            ) : <div className="today-cover-placeholder"><BookOpen className="h-8 w-8" /><span>{activeBook.title}</span><small>{activeBook.author || "PageTurn edition"}</small></div>}
-            <span className="today-cover-progress" style={{ width: `${Math.max(3, Math.min(100, activeBook.progress_percentage))}%` }} />
-          </Link>
+
+          {/* Main Hero Spread */}
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-center">
+            {/* 3D Tactile Physical Book Presentation */}
+            <div className="md:col-span-4 lg:col-span-3 flex justify-center md:justify-start">
+              <Link
+                href={`/read/${latestBook.book_id}`}
+                className="group relative block aspect-[2/3] w-48 sm:w-56 md:w-full max-w-[240px] rounded-md overflow-hidden cursor-pointer transition-transform duration-500 ease-out hover:scale-[1.02] hover:-translate-y-1 shadow-[0_14px_28px_-16px_rgba(0,0,0,0.55)]"
+                title={`Open "${latestBook.title}"`}
+              >
+                {/* Physical Book Spine Crease & Shadow Overlay */}
+                <div className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-black/60 via-black/20 to-transparent z-20 pointer-events-none" />
+                <div className="absolute inset-y-0 left-1 w-px bg-white/20 z-20 pointer-events-none" />
+
+                {/* Bookmark Ribbon hanging over top edge */}
+                <div className="absolute top-0 right-5 w-4 h-12 bg-[#355c4a] shadow-md z-30 pointer-events-none transform transition-transform group-hover:translate-y-1">
+                  <div className="absolute bottom-0 left-0 right-0 h-2 bg-[#17201b] clip-ribbon-tip" />
+                </div>
+
+                {/* Outer Paper Deckled Edge Highlight */}
+                <div className="absolute inset-y-1 right-0 w-1.5 bg-gradient-to-l from-zinc-300/40 via-zinc-400/20 to-transparent z-20 pointer-events-none" />
+
+                {/* Cover Image or Procedural Cover */}
+                {latestBook.cover_url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={latestBook.cover_url}
+                    alt={latestBook.title}
+                    className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-[#e9eee8] flex flex-col justify-between p-5 border border-[#d8e1d8]">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                      PageTurn Edition
+                    </div>
+                    <div>
+                      <BookOpen className="w-8 h-8 text-[#355c4a] mb-3 opacity-80" />
+                      <p className="font-display font-bold text-sm text-zinc-100 line-clamp-3">
+                        {latestBook.title}
+                      </p>
+                    </div>
+                    <div className="text-[10px] font-mono text-zinc-400">
+                      {latestBook.author || "Unknown"}
+                    </div>
+                  </div>
+                )}
+              </Link>
+            </div>
+
+            {/* Book Metadata & Reading Metrics */}
+            <div className="md:col-span-8 lg:col-span-9 flex flex-col justify-center space-y-6">
+              <div>
+                <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight leading-tight line-clamp-2">
+                  {latestBook.title}
+                </h1>
+                <p className="text-sm sm:text-base text-zinc-400 font-medium mt-1.5">
+                  {latestBook.author ? `by ${latestBook.author}` : "Author Unknown"}
+                </p>
+                {latestBook.description && (
+                  <p className="text-xs sm:text-sm text-zinc-500 line-clamp-2 mt-3 leading-relaxed max-w-2xl">
+                    {latestBook.description}
+                  </p>
+                )}
+              </div>
+
+              {/* Reading Progress Engine */}
+              <div className="space-y-2.5 max-w-xl">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-zinc-400 font-medium flex items-center gap-1.5">
+                    <Bookmark className="w-3.5 h-3.5 text-[#355c4a]" />
+                    Reading Progress
+                  </span>
+                  <span className="font-semibold text-[#355c4a]">
+                    {Math.round(latestBook.progress_percentage)}% Completed
+                  </span>
+                </div>
+
+                <div className="h-1.5 w-full rounded-full bg-[#eeede8] overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-[#355c4a] transition-all duration-500"
+                    style={{ width: `${Math.max(2, Math.min(100, latestBook.progress_percentage))}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons & Quick Controls */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Link
+                  href={`/read/${latestBook.book_id}`}
+                  className="inline-flex items-center gap-2.5 px-5 py-3 rounded-md bg-[#355c4a] hover:bg-[#294c3d] text-white font-semibold text-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+                >
+                  <BookOpen className="w-4 h-4 text-white" />
+                  Resume Reading
+                  <ArrowRight className="w-4 h-4 text-white" />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setManagingCollectionsForBook({
+                      id: latestBook.book_id,
+                      title: latestBook.title,
+                      tags: latestBook.tags || [],
+                      shelves: latestBook.shelves || [],
+                    })
+                  }
+                  className="inline-flex items-center gap-2 px-4 py-3 rounded-full bg-[#202a23] hover:bg-[#263229] border border-[#344137] hover:border-[#d7f36a]/30 text-xs font-mono text-zinc-300 transition-colors cursor-pointer"
+                >
+                  <Layers className="w-3.5 h-3.5 text-zinc-400" />
+                  Shelves & Tags ({(latestBook.shelves?.length || 0) + (latestBook.tags?.length || 0)})
+                </button>
+
+                {latestBook.status !== "completed" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateStatus(latestBook.book_id, "completed")}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-3 rounded-full bg-[#1b241e] hover:bg-[#202a23] border border-[#344137] text-xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                    title="Mark as completed"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Mark Finished
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#d7f36a]/10 border border-[#d7f36a]/20 text-[11px] font-mono text-[#d7f36a]">
+                    Finished
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
         </section>
       ) : (
-        <section className="today-empty rounded-2xl border bg-white px-6 py-12 text-center sm:px-12">
-          <div className="today-empty-icon"><Sparkles className="h-5 w-5" /></div>
-          <p className="today-eyebrow mt-5">A fresh page</p>
-          <h2 className="mt-2 text-2xl font-semibold">Your next chapter starts here.</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">Import an EPUB to begin, or pick something from your reading queue.</p>
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button type="button" onClick={triggerUploadModal} className="today-primary"><Plus className="h-4 w-4" /> Add your first book</button>
-            <Link href="/library" className="today-secondary">Explore your library <ArrowRight className="h-4 w-4" /></Link>
+        /* Empty shelf */
+        <section className="relative rounded-2xl md:rounded-3xl border border-[#344137] bg-[#1b241e]/60 p-10 md:p-16 text-center overflow-hidden">
+          <div className="max-w-md mx-auto space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-[#202a23] border border-[#344137] flex items-center justify-center mx-auto text-[#d7f36a]">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="font-display text-2xl font-bold text-white tracking-tight">
+                Your shelf is ready
+              </h2>
+              <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
+                Import an EPUB to start reading. PageTurn keeps your place, notes and bookmarks ready when you return.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={triggerUploadModal}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#d7f36a] hover:bg-[#e7f4ad] text-[#17201b] font-display font-semibold text-xs tracking-wide transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+              >
+                Import an EPUB
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <Link
+                href="/library"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#202a23] hover:bg-[#263229] border border-[#344137] text-xs font-mono text-zinc-300 transition-colors"
+              >
+                <Compass className="w-3.5 h-3.5 text-zinc-400" />
+                Browse Library
+              </Link>
+            </div>
           </div>
         </section>
       )}
 
-      <section className="today-summary mt-5 grid grid-cols-3 divide-x rounded-xl border bg-white">
-        <div><span>In progress</span><strong>{readingBooks.length}</strong></div>
-        <div><span>In your queue</span><strong>{books.filter((book) => book.status === "plan_to_read").length}</strong></div>
-        <div><span>Finished</span><strong>{completedCount}</strong></div>
-      </section>
-
-      <div className="mt-12 grid gap-10 lg:grid-cols-[1.12fr_.88fr]">
-        <section>
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div><p className="today-eyebrow">When you’re ready</p><h2 className="mt-1 text-xl font-semibold">Up next</h2></div>
-            <Link href="/library" className="today-text-link">View library <ChevronRight className="h-4 w-4" /></Link>
+      {/* =========================================================================
+          SHELF OVERVIEW
+      ========================================================================= */}
+      {books.length > 0 && (
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-1">
+          <div className="p-4 rounded-xl bg-[#1b241e] border border-[#344137] flex flex-col justify-between">
+            <span className="font-mono text-[10px] uppercase text-zinc-500 tracking-wider">
+              Total Books
+            </span>
+            <span className="font-display font-bold text-2xl text-zinc-100 mt-2">
+              {stats.total}
+            </span>
           </div>
-          {queue.length ? <div className="today-queue divide-y rounded-xl border bg-white">
-            {queue.map((book) => <article className="today-queue-item flex items-center gap-3 p-4 sm:gap-4" key={book.book_id}>
-              <Link href={`/read/${book.book_id}`} className="today-queue-cover">
-                {book.cover_url ? (
-                  /* eslint-disable-next-line @next/next/no-img-element -- Cover URLs are user-scoped storage URLs and are not allowlisted for Next image optimization. */
-                  <img src={book.cover_url} alt="" loading="lazy" decoding="async" />
-                ) : <BookOpen className="h-5 w-5" />}
-              </Link>
-              <div className="min-w-0 flex-1"><Link href={`/read/${book.book_id}`} className="block truncate text-sm font-medium text-zinc-800 hover:text-[#355c4a]">{book.title}</Link><p className="mt-1 truncate text-xs text-zinc-500">{book.author || "Author not listed"}</p></div>
-              <button type="button" onClick={async () => { if (await moveToStatus(book, "reading")) router.push(`/read/${book.book_id}`); }} className="today-queue-action">Start reading <ArrowRight className="h-3.5 w-3.5" /></button>
-            </article>)}
-          </div> : <div className="today-queue-empty"><Clock3 className="h-4 w-4" /> Your reading queue is clear. Add a book from the library when something catches your eye.</div>}
-
-          {otherReading.length > 0 && <div className="mt-10">
-            <div className="mb-4 flex items-end justify-between"><div><p className="today-eyebrow">More in progress</p><h2 className="mt-1 text-xl font-semibold">Keep these close</h2></div><Link href="/library" className="today-text-link">All reading <ChevronRight className="h-4 w-4" /></Link></div>
-            <div className="today-reading-list divide-y rounded-xl border bg-white">
-              {otherReading.slice(0, 4).map((book) => <Link key={book.book_id} href={`/read/${book.book_id}`} className="today-reading-row flex items-center gap-3 p-4">
-                <span className="today-queue-cover">{book.cover_url ? (
-                  /* eslint-disable-next-line @next/next/no-img-element -- Cover URLs are user-scoped storage URLs and are not allowlisted for Next image optimization. */
-                  <img src={book.cover_url} alt="" loading="lazy" decoding="async" />
-                ) : <BookOpen className="h-5 w-5" />}</span>
-                <span className="min-w-0 flex-1"><strong className="block truncate text-sm font-medium">{book.title}</strong><small className="mt-1 block text-xs text-zinc-500">{Math.round(book.progress_percentage)}% complete</small></span>
-                <ChevronRight className="h-4 w-4 text-zinc-400" />
-              </Link>)}
-            </div>
-          </div>}
+          <div className="p-4 rounded-xl bg-[#1b241e] border border-[#344137] flex flex-col justify-between">
+            <span className="font-mono text-[10px] uppercase text-zinc-500 tracking-wider">
+              In Progress
+            </span>
+            <span className="font-display font-bold text-2xl text-[#d7f36a] mt-2">
+              {stats.reading}
+            </span>
+          </div>
+          <div className="p-4 rounded-xl bg-[#1b241e] border border-[#344137] flex flex-col justify-between">
+            <span className="font-mono text-[10px] uppercase text-zinc-500 tracking-wider">
+              Completed
+            </span>
+            <span className="font-display font-bold text-2xl text-emerald-400 mt-2">
+              {stats.completed}
+            </span>
+          </div>
+          <div className="p-4 rounded-xl bg-[#1b241e] border border-[#344137] flex flex-col justify-between">
+            <span className="font-mono text-[10px] uppercase text-zinc-500 tracking-wider">
+              Want to Read
+            </span>
+            <span className="font-display font-bold text-2xl text-zinc-400 mt-2">
+              {stats.wantToRead}
+            </span>
+          </div>
         </section>
+      )}
 
-        <aside className="today-side-column">
-          <section className="today-notebook-card rounded-xl border p-5 sm:p-6">
-            <div className="today-notebook-icon"><NotebookPen className="h-[18px] w-[18px]" /></div>
-            <p className="today-eyebrow mt-5">Your notebook</p>
-            <h2 className="mt-1 text-xl font-semibold">Ideas worth keeping.</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-500">Highlights, marginal notes, and bookmarks from every book—together in one searchable place.</p>
-            <Link href="/notebook" className="today-text-link mt-5">Open notebook <ArrowRight className="h-4 w-4" /></Link>
-          </section>
-          <Link href="/history" className="today-history-link mt-3 flex items-center justify-between rounded-xl border bg-white p-5">
-            <span><span className="today-eyebrow">Your reading rhythm</span><strong className="mt-1 block text-sm font-medium">See your history and goals</strong></span>
-            <ChevronRight className="h-4 w-4 text-zinc-400" />
-          </Link>
-        </aside>
-      </div>
+      {/* =========================================================================
+                          RECENTLY READ
+      ========================================================================= */}
+      {recentBooks.length > 0 && (
+        <section className="space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-[#344137]/60">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-zinc-700">
+                Recently read
+              </span>
+              <span className="text-xs text-zinc-500">
+                {recentBooks.length} {recentBooks.length === 1 ? "book" : "books"}
+              </span>
+            </div>
 
-      {managing && <ManageCollectionsDialog bookId={managing.id} bookTitle={managing.title} initialTags={managing.tags} initialShelves={managing.shelves} onClose={() => setManaging(null)} onUpdate={() => { void refreshBooks(); }} />}
+            <Link
+              href="/library"
+              className="group inline-flex items-center gap-1.5 text-xs font-mono text-[#d7f36a] hover:underline"
+            >
+              View library
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
+
+          <div className="library-book-grid">
+            {recentBooks.map((book) => (
+              <BookCard
+                key={book.id}
+                book={book}
+                variant="grid"
+                onDelete={handleDelete}
+                onUpdateStatus={handleUpdateStatus}
+                onManageTags={(id) => {
+                  const b = books.find((x) => x.book_id === id);
+                  if (b) {
+                    setManagingCollectionsForBook({
+                      id: b.book_id,
+                      title: b.title,
+                      tags: b.tags || [],
+                      shelves: b.shelves || [],
+                    });
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Collections Management Dialog */}
+      {managingCollectionsForBook && (
+        <ManageCollectionsDialog
+          bookId={managingCollectionsForBook.id}
+          bookTitle={managingCollectionsForBook.title}
+          initialTags={managingCollectionsForBook.tags}
+          initialShelves={managingCollectionsForBook.shelves}
+          onClose={() => setManagingCollectionsForBook(null)}
+          onUpdate={fetchBooks}
+        />
+      )}
     </div>
   );
 }

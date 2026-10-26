@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { LogOut, Save, Target, User as UserIcon, Loader2, Download } from "lucide-react";
 import { exportAllUserData } from "@/app/actions/stats.actions";
-import { toast } from "@/lib/toast";
 
 export default function SettingsPage() {
   const [dailyGoal, setDailyGoal] = useState(60);
@@ -50,25 +49,20 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("You need to sign in again before saving.");
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({ daily_goal_minutes: dailyGoal })
-        .eq("id", user.id);
-      if (error) throw error;
+    await supabase
+      .from("profiles")
+      .update({ daily_goal_minutes: dailyGoal })
+      .eq("id", user.id);
 
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 2000);
-    } catch (error) {
-      console.error("Could not save reading goal", error);
-      toast.error("Your reading goal could not be saved");
-    } finally {
-      setSaving(false);
-    }
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   const handleSignOut = async () => {
@@ -89,7 +83,7 @@ export default function SettingsPage() {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Failed to export data:", err);
       alert("Failed to export data. Please try again.");

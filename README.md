@@ -1,6 +1,6 @@
 # PageTurn 📖
 
-PageTurn is an offline-first EPUB reading system for the browser. It brings your library, reading queue, focused reader, cross-book notebook, and reading history into one calm workspace. A Today desk makes it easy to resume a book, while the reader keeps typography, navigation, annotations, and offline progress close at hand.
+PageTurn is a modern, offline-first personal EPUB e-reader, library manager, and reading habit tracker. Engineered with a physical book tactile philosophy and a minimalist **Obsidian & Electric Signal** aesthetic inspired by Nothing OS and Apple typography, PageTurn delivers a distraction-free, app-like reading experience straight to the browser.
 
 ---
 
@@ -11,7 +11,7 @@ PageTurn is an offline-first EPUB reading system for the browser. It brings your
 | **Framework** | [Next.js 16.3 (App Router)](https://nextjs.org/) & [React 19.2](https://react.dev/) |
 | **Language & Tooling** | [TypeScript 5](https://www.typescriptlang.org/), [ESLint 9](https://eslint.org/), Webpack build pipeline |
 | **Styling & UI** | [Tailwind CSS v4](https://tailwindcss.com/), [Lucide React](https://lucide.dev/), Custom Design Tokens |
-| **Typography** | Native system sans serif for the interface, installed system serif for reading, adjustable text size and line spacing |
+| **Typography** | `Space Grotesk` (Display), `DM Sans` (Body), `DM Mono` (Telemetry/Data), `Source Serif 4` & `OpenDyslexic` (Reader) |
 | **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL, Row Level Security, Storage Buckets, Realtime WebSockets, OAuth) |
 | **EPUB Engine** | [epub.js](http://epubjs.org/) & [JSZip](https://stuk.github.io/jszip/) |
 | **PWA & Offline** | [@serwist/next](https://github.com/serwist/serwist) (Service Workers) & [localforage](https://localforage.github.io/localForage/) (IndexedDB LRU Cache) |
@@ -22,15 +22,15 @@ PageTurn is an offline-first EPUB reading system for the browser. It brings your
 
 ## ✨ Features Overview
 
-### 1. 📖 Focused EPUB Reader
-- **Reader canvas**: A centered, distraction-free EPUB page with low-chrome controls, tap-to-reveal navigation, and keyboard shortcuts.
-- **Reading themes**: Choose from four display modes:
-  - **Warm Light** (`#fbfaf6` paper with deep ink text)
+### 1. 📖 Tactile EPUB Reader Engine
+- **Physical Book Canvas**: Centered document stage with realistic paper deckle edge, spine crease ambient shading, and smooth 3D page curl flip transitions (`page-turn-flip-next` / `page-turn-flip-prev`).
+- **Reading Themes**: Instant toggle between 3 paper canvas surfaces:
+  - **Clean Light** (`#ffffff` paper with deep ink text)
   - **Warm Sepia Paper** (`#f4ecd8` aged paper with warm brown ink)
-  - **Graphite Dark** (`#171916`)
-  - **OLED Black** (`#000000`)
-- **Reading controls**: Adjustable text size (60%–200%), serif/sans/reading-ease type, compact/comfortable/relaxed line spacing, and publisher style overrides.
-- **Reading modes**: Switch between paginated reading and continuous vertical scrolling.
+  - **Obsidian Dark** (`#111413` low-emission dark mode)
+- **Fluid Typography**: Dynamic type scaling (60% to 200%), font family switching (`Serif`, `Sans-Serif`, `OpenDyslexic`), and standardized publisher CSS overrides.
+- **Reading Modes**: Traditional paginated reader with side-click/arrow-key turns, plus continuous vertical scroll flow.
+- **Desktop Flip Controls**: Ambient floating side arrow navigation buttons (`←` / `→`) and tap-to-reveal HUD.
 
 ### 2. 🔍 In-Book Search & Text-to-Speech (TTS)
 - **Full-Text Chapter Search**: Real-time keyword scanning across all EPUB sections with highlighted excerpt previews and direct CFI navigation.
@@ -50,10 +50,10 @@ PageTurn is an offline-first EPUB reading system for the browser. It brings your
 - **Contextual Reader Actions**: Switch canvas themes, toggle Read Aloud (`T`), toggle Bookmarks (`B`), open Table of Contents (`M`), toggle Zen Mode (`F`), or import new EPUBs (`U`).
 
 ### 5. 📚 Library & Shelf Organization
-- **Today reading desk**:
-  - Resume the most recently read book that is still in progress.
-  - Keep a visible reading queue and start a queued title in one step.
-  - See other active books, a library summary, and quick access to notebook and history.
+- **Dynamic Shelf Dashboard**:
+  - Hero spotlight card for the currently reading book with cover art, progress ring, last-read relative timestamp (`formatRelativeTime`), and quick continue button.
+  - Telemetry stats strip: Total Books, Actively Reading, and Finished counts.
+  - "Jump Back In" carousel for recently opened books.
 - **Library Management**:
   - Toggle between responsive **Grid** and **List** view modes.
   - Filter by reading state: `All`, `Reading`, `Want to Read` (`plan_to_read`), and `Finished` (`completed`).
@@ -63,13 +63,7 @@ PageTurn is an offline-first EPUB reading system for the browser. It brings your
   - **Metadata Editor**: Edit book title, author, description, and cover image URL in-app.
   - **Cascading Book Deletion**: Safe removal that cascades across all database relations and purges both Supabase Storage objects (`epubs` & `covers`) and IndexedDB local caches.
 
-### 6. 🗒️ Cross-Book Notebook
-- Review highlights, personal notes, and bookmarks from every book in one place.
-- Filter by entry type and search passage text, notes, titles, and authors.
-- Return to the saved reading location from any notebook entry.
-- Export the full notebook as a portable Markdown file.
-
-### 7. 📊 Reading Analytics, Streaks & Habit Tracking
+### 6. 📊 Reading Analytics, Streaks & Habit Tracking
 - **Automatic Session Tracking**: Reading sessions over 30 seconds are logged automatically with start/end timestamps, duration, chapter name, and calculated words read.
 - **Streak Contribution Heatmap**: GitHub-style 20-week calendar heatmap visualizing daily reading consistency with intensity shading and tooltips.
 - **Daily Reading Goals**: User-configurable daily goal target in minutes (stored in user profile) with animated SVG progress rings.
@@ -79,7 +73,7 @@ PageTurn is an offline-first EPUB reading system for the browser. It brings your
   - **Reading Velocity**: Line chart tracking daily word output.
 - **Full Data Portability**: One-click JSON data export (`pageturn-export-YYYY-MM-DD.json`) bundling all profiles, books, sessions, bookmarks, highlights, tags, and shelves.
 
-### 8. ☁️ Offline-First Architecture & Realtime Sync
+### 7. ☁️ Offline-First Architecture & Realtime Sync
 - **Local EPUB Caching**: EPUB files are cached as ArrayBuffers in IndexedDB via `localforage` (`epub_cache`) using an **LRU (Least Recently Used) eviction policy** (capped at 10 cached books) with magic-byte validation (`PK\x03\x04`).
 - **Immediate Local Persistence**: CFI reading positions, bookmarks, and highlights are committed to local IndexedDB stores (`reading_positions`, `local_bookmarks`, `local_highlights`) in `< 0.1ms` before network dispatch.
 - **Background Offline Queue**: Offline mutations are queued in IndexedDB (`offline_queue`), deduplicated, coalesced to eliminate redundant intermediate progress writes, and automatically flushed in strict FIFO order with exponential backoff on reconnection (`window.online`).

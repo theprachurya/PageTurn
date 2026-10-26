@@ -107,13 +107,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="app-shell min-h-screen text-zinc-900 antialiased"
+      className="app-shell min-h-screen text-zinc-900 selection:bg-emerald-100 selection:text-emerald-950 antialiased"
       data-reader={isReader ? "true" : undefined}
     >
       {!isReader && <TopNav />}
       {!isReader && <BottomNav />}
 
-      <main className={cn("min-h-screen relative z-10", !isReader && "pt-16 pb-24 md:ml-[252px] md:pt-[76px] md:pb-8")}>
+      <main className={cn("min-h-screen relative z-10", !isReader && "pt-16 pb-20 md:pb-8")}>
         {children}
       </main>
 

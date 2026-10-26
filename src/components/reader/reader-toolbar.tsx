@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -29,7 +29,6 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Monitor,
 } from "lucide-react";
 import type { ReaderSettings } from "@/lib/reader-settings";
 import { cn } from "@/lib/utils";
@@ -55,24 +54,6 @@ export interface HighlightData {
   note?: string | null;
   text?: string;
   created_at: string;
-}
-
-function renderSearchExcerpt(text: string, query: string): ReactNode[] {
-  const needle = query.trim();
-  if (!needle) return [text];
-  const lower = text.toLocaleLowerCase();
-  const target = needle.toLocaleLowerCase();
-  const parts: ReactNode[] = [];
-  let cursor = 0;
-  let match = lower.indexOf(target, cursor);
-  while (match !== -1) {
-    if (match > cursor) parts.push(text.slice(cursor, match));
-    parts.push(<mark className="reader-search-match" key={`${match}-${parts.length}`}>{text.slice(match, match + needle.length)}</mark>);
-    cursor = match + needle.length;
-    match = lower.indexOf(target, cursor);
-  }
-  if (cursor < text.length) parts.push(text.slice(cursor));
-  return parts;
 }
 
 interface ReaderToolbarProps {
@@ -676,7 +657,10 @@ export function ReaderToolbar({
                         }}
                         className="w-full text-left p-3 rounded-xl bg-[#1b241e] border border-[#344137] hover:border-[#d7f36a]/40 transition-colors text-xs cursor-pointer"
                       >
-                        <p className="text-zinc-300 text-xs leading-relaxed">{renderSearchExcerpt(res.excerpt, searchQuery)}</p>
+                        <p
+                          className="text-zinc-300 text-xs leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: res.excerpt }}
+                        />
                       </button>
                     ))
                   ) : searchQuery ? (
@@ -726,12 +710,6 @@ export function ReaderToolbar({
                     bg: "bg-[#121a15] text-zinc-100 border border-[#344137]",
                   },
                   {
-                    value: "oled" as const,
-                    label: "OLED",
-                    icon: Monitor,
-                    bg: "bg-black text-zinc-100 border border-[#344137]",
-                  },
-                  {
                     value: "sepia" as const,
                     label: "Paper",
                     icon: BookOpen,
@@ -751,20 +729,6 @@ export function ReaderToolbar({
                   >
                     <theme.icon className="w-3.5 h-3.5" />
                     {theme.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#344137] pt-3">
-              <span className="text-xs text-zinc-400">Page layout</span>
-              <div className="flex gap-1 rounded-lg bg-[#121a15] p-1">
-                {[
-                  { value: "paged" as const, label: "Pages" },
-                  { value: "scrolled" as const, label: "Scroll" },
-                ].map((mode) => (
-                  <button key={mode.value} type="button" onClick={() => onSettingsChange({ readingMode: mode.value })} aria-pressed={settings.readingMode === mode.value} className={cn("rounded-md px-3 py-1.5 text-xs transition-colors", settings.readingMode === mode.value ? "bg-[#d7f36a] text-[#17201b] font-semibold" : "text-zinc-400 hover:text-zinc-200")}>
-                    {mode.label}
                   </button>
                 ))}
               </div>
@@ -805,7 +769,7 @@ export function ReaderToolbar({
             {/* Typography Font Family */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-zinc-400">Typeface</span>
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="flex gap-2">
                 {[
                   { value: "serif" as const, label: "Serif" },
                   { value: "sans-serif" as const, label: "Sans" },
@@ -829,31 +793,14 @@ export function ReaderToolbar({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs text-zinc-400">Line spacing</span>
-              <div className="flex gap-1">
-                {[
-                  { value: "compact" as const, label: "Compact" },
-                  { value: "comfortable" as const, label: "Comfort" },
-                  { value: "relaxed" as const, label: "Relaxed" },
-                ].map((spacing) => (
-                  <button key={spacing.value} type="button" onClick={() => onSettingsChange({ lineSpacing: spacing.value })} aria-pressed={settings.lineSpacing === spacing.value} className={cn("rounded-md border px-2.5 py-1.5 text-[11px] transition-colors", settings.lineSpacing === spacing.value ? "bg-[#d7f36a] border-[#d7f36a] text-[#17201b] font-semibold" : "bg-[#1b241e] border-[#344137] text-zinc-400 hover:text-zinc-200")}>
-                    {spacing.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Custom Publisher CSS Override */}
             <div className="flex items-center justify-between pt-1">
-              <span className="text-xs text-zinc-400">Page styling</span>
+              <span className="text-xs text-zinc-400">Use publisher styling</span>
               <button
                 type="button"
                 onClick={() =>
                   onSettingsChange({ disablePublisherCSS: !settings.disablePublisherCSS })
                 }
-                aria-pressed={settings.disablePublisherCSS}
-                aria-label="Toggle publisher page styling"
                 className={cn(
                   "px-3 py-1 rounded-xl text-xs font-mono transition-all cursor-pointer border",
                   settings.disablePublisherCSS
@@ -861,7 +808,7 @@ export function ReaderToolbar({
                     : "bg-[#1b241e] border-[#344137] text-zinc-400 hover:text-zinc-200"
                 )}
               >
-                {settings.disablePublisherCSS ? "PageTurn" : "Publisher"}
+                {settings.disablePublisherCSS ? "Enabled" : "Original"}
               </button>
             </div>
           </div>
