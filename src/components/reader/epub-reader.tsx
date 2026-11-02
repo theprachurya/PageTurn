@@ -76,6 +76,7 @@ export function EpubReader({
   const wpmRef = useRef<number>(250);
 
   const [showToolbar, setShowToolbar] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [distractionFree, setDistractionFree] = useState(false);
   const [flipDirection, setFlipDirection] = useState<"next" | "prev" | null>(null);
   const [currentCfi, setCurrentCfi] = useState(initialCfi || "");
@@ -629,6 +630,7 @@ export function EpubReader({
       if (e.key === "Escape") {
         setDistractionFree(false);
         setShowToolbar(false);
+        setShowSidebar(false);
         setDictionaryWord(null);
         setSelection(null);
       }
@@ -1056,7 +1058,11 @@ export function EpubReader({
       onToggleTheme: (theme) => updateSettings({ theme }),
       onToggleTTS: () => void handleToggleTTS(),
       onToggleBookmark: () => void handleToggleBookmark(),
-      onToggleSidebar: () => setShowToolbar((prev) => !prev),
+      onToggleSidebar: () => {
+        setShowToolbar(true);
+        setDistractionFree(false);
+        setShowSidebar((prev) => !prev);
+      },
       onToggleDistractionFree: () => setDistractionFree((prev) => !prev),
       toc,
       onNavigateChapter: navigateTo,
@@ -1181,6 +1187,8 @@ export function EpubReader({
       {/* Reader Floating Instrument Toolbar */}
       <ReaderToolbar
         visible={showToolbar && !distractionFree}
+        sidebarOpen={showSidebar}
+        onSidebarOpenChange={setShowSidebar}
         chapter={chapter || "Unknown Chapter"}
         progress={progress}
         chapterProgress={chapterProgress}

@@ -259,6 +259,24 @@ export function CommandPalette({
           },
         });
       }
+
+      if (readerActions.toc && readerActions.onNavigateChapter) {
+        readerActions.toc.forEach((chapter, idx) => {
+          const label = chapter.label?.trim();
+          if (!label) return;
+          list.push({
+            id: `reader-chapter-${chapter.id || idx}`,
+            title: `Chapter: ${label}`,
+            subtitle: "Jump to section in current book",
+            icon: BookOpen,
+            category: "Reader",
+            perform: () => {
+              readerActions.onNavigateChapter?.(chapter.href);
+              onClose();
+            },
+          });
+        });
+      }
     }
 
     // Books jump

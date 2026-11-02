@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import type { ReaderSettings } from "@/lib/reader-settings";
 import { cn } from "@/lib/utils";
+import { HIGHLIGHT_COLORS, type HighlightColor } from "./highlight-popover";
 
 export interface NavItem {
   id: string;
@@ -74,6 +75,8 @@ interface ReaderToolbarProps {
   onSearch?: (query: string) => void;
   searchResults?: { cfi: string; excerpt: string }[];
   isSearching?: boolean;
+  sidebarOpen?: boolean;
+  onSidebarOpenChange?: (open: boolean) => void;
   onClose: () => void;
 }
 
@@ -101,10 +104,17 @@ export function ReaderToolbar({
   onSearch,
   searchResults = [],
   isSearching = false,
+  sidebarOpen,
+  onSidebarOpenChange,
   onClose,
 }: ReaderToolbarProps) {
   const router = useRouter();
-  const [showSidebar, setShowSidebar] = useState(false);
+  const [internalSidebar, setInternalSidebar] = useState(false);
+  const showSidebar = sidebarOpen !== undefined ? sidebarOpen : internalSidebar;
+  const setShowSidebar = (next: boolean) => {
+    setInternalSidebar(next);
+    onSidebarOpenChange?.(next);
+  };
   const [showTypographyDrawer, setShowTypographyDrawer] = useState(false);
   const [activeTab, setActiveTab] = useState<"toc" | "bookmarks" | "highlights" | "search">("toc");
   const [searchQuery, setSearchQuery] = useState("");
@@ -393,7 +403,11 @@ export function ReaderToolbar({
                       onClose();
                     }}
                     className="w-full text-left p-3 rounded-xl bg-[#1b241e] hover:bg-[#202a23] border border-[#344137] transition-colors text-xs cursor-pointer space-y-1.5"
-                    style={{ borderLeft: `3px solid ${hl.color || "#d7f36a"}` }}
+                    style={{
+                      borderLeft: `3px solid ${
+                        HIGHLIGHT_COLORS[hl.color as HighlightColor] || hl.color || "#d7f36a"
+                      }`,
+                    }}
                   >
                     {hl.text && <p className="italic text-zinc-300 line-clamp-2">&ldquo;{hl.text}&rdquo;</p>}
                     {hl.note && (

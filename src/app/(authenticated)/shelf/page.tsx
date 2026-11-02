@@ -19,6 +19,7 @@ import { updateReadingStatus, deleteBook, type BookStatus } from "@/app/actions/
 import { removeCachedEpub } from "@/lib/epub-cache";
 import { purgeBookOfflineData } from "@/lib/offline-queue";
 import { ManageCollectionsDialog } from "@/components/library/manage-collections-dialog";
+import { EditBookMetadataDialog } from "@/components/library/edit-book-metadata-dialog";
 import { triggerUploadModal } from "@/lib/app-events";
 import { toast } from "@/lib/toast";
 
@@ -43,6 +44,7 @@ function formatRelativeTime(dateStr: string | null): string {
 export default function ShelfPage() {
   const [books, setBooks] = useState<BookData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingBook, setEditingBook] = useState<BookData | null>(null);
   const [managingCollectionsForBook, setManagingCollectionsForBook] = useState<{
     id: string;
     title: string;
@@ -520,6 +522,10 @@ export default function ShelfPage() {
                 variant="grid"
                 onDelete={handleDelete}
                 onUpdateStatus={handleUpdateStatus}
+                onEditMetadata={(id) => {
+                  const b = books.find((x) => x.book_id === id);
+                  if (b) setEditingBook(b);
+                }}
                 onManageTags={(id) => {
                   const b = books.find((x) => x.book_id === id);
                   if (b) {
@@ -546,6 +552,36 @@ export default function ShelfPage() {
           initialShelves={managingCollectionsForBook.shelves}
           onClose={() => setManagingCollectionsForBook(null)}
           onUpdate={fetchBooks}
+        />
+      )}
+
+      {/* Metadata Editor Dialog */}
+      {editingBook && (
+        <EditBookMetadataDialog
+          bookId={editingBook.book_id}
+          initialMetadata={{
+            title: editingBook.title,
+            author: editingBook.author || "",
+            description: editingBook.description || "",
+            cover_url: editingBook.cover_url || "",
+          }}
+          onClose={() => setEditingBook(null)}
+          onSaved={(metadata) => {
+            setBooks((current) =>
+              current.map((book) =>
+                book.book_id === editingBook.book_id
+                  ? {
+                      ...book,
+                      ...metadata,
+                      author: metadata.author || null,
+                      description: metadata.description || null,
+                      cover_url: metadata.cover_url || null,
+                    }
+                  : book
+              )
+            );
+            toast.success("Metadata updated");
+          }}
         />
       )}
     </div>

@@ -7,6 +7,11 @@ interface StreakHeatmapProps {
   sessionsByDate: Record<string, number>; // date string -> total minutes
 }
 
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
   const { weeks, months } = useMemo(() => {
     const today = new Date();
@@ -32,17 +37,21 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
       cells.push(week);
     }
 
-    // Extract month labels
+    // Extract month labels using local date parsing and prevent label collision
     const monthLabels: { label: string; col: number }[] = [];
     let lastMonth = -1;
+    let lastCol = -10;
     cells.forEach((week, i) => {
-      const d = new Date(week[0].date);
+      const d = parseLocalDate(week[0].date);
       const month = d.getMonth();
       if (month !== lastMonth) {
-        monthLabels.push({
-          label: d.toLocaleString("default", { month: "short" }),
-          col: i,
-        });
+        if (i - lastCol >= 2) {
+          monthLabels.push({
+            label: d.toLocaleString("default", { month: "short" }),
+            col: i,
+          });
+          lastCol = i;
+        }
         lastMonth = month;
       }
     });
@@ -77,16 +86,13 @@ export function StreakHeatmap({ sessionsByDate }: StreakHeatmapProps) {
 
         {/* Grid */}
         <div>
-          {/* Month labels */}
-          <div className="flex gap-1 mb-1">
+          {/* Month labels positioned directly over their 16px column (12px cell + 4px gap) */}
+          <div className="relative h-4 mb-1">
             {months.map((m, i) => (
               <div
                 key={i}
-                className="text-[9px] font-mono text-zinc-500"
-                style={{
-                  position: "relative",
-                  left: `${m.col * 16}px`,
-                }}
+                className="absolute top-0 text-[9px] font-mono text-zinc-500 whitespace-nowrap"
+                style={{ left: `${m.col * 16}px` }}
               >
                 {m.label}
               </div>

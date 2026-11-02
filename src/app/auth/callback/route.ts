@@ -2,10 +2,19 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+function getSafeRedirectPath(rawNext: string | null): string {
+  if (!rawNext) return "/shelf";
+  // Must start with a single "/" and not "//" or "/\"
+  if (rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.startsWith("/\\")) {
+    return rawNext;
+  }
+  return "/shelf";
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/shelf";
+  const next = getSafeRedirectPath(searchParams.get("next"));
 
   if (code) {
     const cookieStore = await cookies();
@@ -33,21 +42,14 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // Ensure profile exists
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (user) {
-        const { data: profile } = await supabase
+        await supabase
           .from("profiles")
-          .select("id")
-          .eq("id", user.id)
-          .single();
-
-        if (!profile) {
-          await supabase.from("profiles").insert({ id: user.id });
-        }
+          .upsert({ id: user.id }, { onConflict: "id", ignoreDuplicates: true });
       }
 
       const forwardedHost = request.headers.get("x-forwarded-host");
@@ -63,6 +65,5 @@ export async function GET(request: Request) {
     }
   }
 
-  // Something went wrong, redirect to error page or landing
   return NextResponse.redirect(`${origin}/?error=auth_callback_error`);
 }

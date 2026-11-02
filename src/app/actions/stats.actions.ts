@@ -157,7 +157,9 @@ export async function exportAllUserData(): Promise<Record<string, unknown>> {
     { data: bookmarks },
     { data: highlights },
     { data: tags },
-    { data: shelves }
+    { data: bookTags },
+    { data: shelves },
+    { data: shelfBooks },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("books").select("*").eq("user_id", user.id),
@@ -166,7 +168,9 @@ export async function exportAllUserData(): Promise<Record<string, unknown>> {
     supabase.from("bookmarks").select("*").eq("user_id", user.id),
     supabase.from("highlights").select("*").eq("user_id", user.id),
     supabase.from("tags").select("*").eq("user_id", user.id),
-    supabase.from("shelves").select("*").eq("user_id", user.id)
+    supabase.from("book_tags").select("*").eq("user_id", user.id),
+    supabase.from("shelves").select("*").eq("user_id", user.id),
+    supabase.from("shelf_books").select("*").eq("user_id", user.id),
   ]);
 
   return {
@@ -179,6 +183,8 @@ export async function exportAllUserData(): Promise<Record<string, unknown>> {
     bookmarks,
     highlights,
     tags,
-    shelves
+    bookTags,
+    shelves,
+    shelfBooks,
   };
 }

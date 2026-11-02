@@ -5,6 +5,15 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { LogOut, Save, Target, User as UserIcon, Loader2, Download } from "lucide-react";
 import { exportAllUserData } from "@/app/actions/stats.actions";
+import { clearEpubCache } from "@/lib/epub-cache";
+import {
+  clearQueue,
+  positionStore,
+  bookmarksStore,
+  highlightsStore,
+  appliedStore,
+} from "@/lib/offline-queue";
+import { toast } from "@/lib/toast";
 
 export default function SettingsPage() {
   const [dailyGoal, setDailyGoal] = useState(60);
@@ -49,25 +58,41 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
 
-    await supabase
-      .from("profiles")
-      .update({ daily_goal_minutes: dailyGoal })
-      .eq("id", user.id);
+      const { error } = await supabase
+        .from("profiles")
+        .upsert({ id: user.id, daily_goal_minutes: dailyGoal });
 
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+      if (error) throw error;
+
+      setSaved(true);
+      toast.success("Daily reading goal updated");
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+      toast.error("Failed to save daily goal");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSignOut = async () => {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    await Promise.allSettled([
+      clearEpubCache(),
+      clearQueue(),
+      positionStore.clear(),
+      bookmarksStore.clear(),
+      highlightsStore.clear(),
+      appliedStore.clear(),
+      supabase.auth.signOut(),
+    ]);
     router.push("/");
   };
 
@@ -84,9 +109,10 @@ export default function SettingsPage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      toast.success("Data exported successfully");
     } catch (err) {
       console.error("Failed to export data:", err);
-      alert("Failed to export data. Please try again.");
+      toast.error("Failed to export data. Please try again.");
     } finally {
       setExporting(false);
     }
@@ -116,7 +142,9 @@ export default function SettingsPage() {
         </div>
         <div className="space-y-4">
           <div>
-            <label className="text-[11px] text-zinc-500 font-mono mb-1.5 block uppercase tracking-wider">Email Address</label>
+            <label className="text-[11px] text-zinc-500 font-mono mb-1.5 block uppercase tracking-wider">
+              Email Address
+            </label>
             <div className="px-4 py-2.5 rounded-lg bg-[#08080a] border border-[#1f1f23] text-zinc-300 text-sm font-mono">
               {email}
             </div>
@@ -128,9 +156,7 @@ export default function SettingsPage() {
       <div className="card rounded-xl p-6 mb-4">
         <div className="flex items-center gap-2 mb-4">
           <Target className="w-4 h-4 text-gold-500" />
-          <h2 className="text-base font-semibold text-zinc-100">
-            Daily Reading Goal
-          </h2>
+          <h2 className="text-base font-semibold text-zinc-100">Daily Reading Goal</h2>
         </div>
         <div className="space-y-4">
           <div>
@@ -162,11 +188,7 @@ export default function SettingsPage() {
             disabled={saving}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gold-500 hover:bg-gold-400 text-zinc-950 font-semibold text-sm transition-all disabled:opacity-50 cursor-pointer"
           >
-            {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saved ? "Saved ✓" : "Save Changes"}
           </button>
         </div>
@@ -176,14 +198,13 @@ export default function SettingsPage() {
       <div className="card rounded-xl p-6 mb-4">
         <div className="flex items-center gap-2 mb-4">
           <Download className="w-4 h-4 text-gold-500" />
-          <h2 className="text-base font-semibold text-zinc-100">
-            Export Data
-          </h2>
+          <h2 className="text-base font-semibold text-zinc-100">Export Data</h2>
         </div>
         <div className="space-y-4">
           <div>
             <p className="text-xs text-zinc-500 leading-relaxed mb-4">
-              Download a complete JSON backup of your account data, including your reading history, shelves, tags, bookmarks, and highlights.
+              Download a complete JSON backup of your account data, including your reading history,
+              shelves, tags, bookmarks, and highlights.
             </p>
           </div>
 

@@ -155,7 +155,10 @@ export default function StatsPage() {
           <div className="relative z-10">
             <p className="section-label mb-1">Total Time Read</p>
             <h3 className="text-3xl font-bold text-zinc-100 flex items-baseline gap-1.5">
-              {Math.round(stats.totalMinutes / 60)}<span className="text-base font-normal text-zinc-500">h</span> {stats.totalMinutes % 60}<span className="text-base font-normal text-zinc-500">m</span>
+              {Math.floor(stats.totalMinutes / 60)}
+              <span className="text-base font-normal text-zinc-500">h</span>{" "}
+              {stats.totalMinutes % 60}
+              <span className="text-base font-normal text-zinc-500">m</span>
             </h3>
           </div>
         </div>
