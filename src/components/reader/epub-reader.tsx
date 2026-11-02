@@ -616,7 +616,21 @@ export function EpubReader({
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         appEvents.openCommandPalette();
+        return;
       }
+      if (isInputFocused(e)) return;
+      // Forward single-key and G-chord shortcuts from inside the epub.js iframe to window
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: e.key,
+          code: e.code,
+          metaKey: e.metaKey,
+          ctrlKey: e.ctrlKey,
+          altKey: e.altKey,
+          shiftKey: e.shiftKey,
+          bubbles: true,
+        })
+      );
     };
 
     const keyupHandler = (e: KeyboardEvent) => {

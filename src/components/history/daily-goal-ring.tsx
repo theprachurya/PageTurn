@@ -13,7 +13,8 @@ export function DailyGoalRing({
   const strokeWidth = 10;
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
-  const percentage = Math.min((currentMinutes / goalMinutes) * 100, 100);
+  const safeGoal = Math.max(1, goalMinutes || 60);
+  const percentage = Math.min((currentMinutes / safeGoal) * 100, 100);
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
   return (

@@ -26,9 +26,15 @@ function ReadBook({ bookId }: { bookId: string }) {
   const loadBook = useCallback(async (signal: AbortSignal) => {
     try {
       const supabase = createClient();
-      const {
+      let {
         data: { user },
       } = await supabase.auth.getUser();
+      if (!user) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        user = session?.user ?? null;
+      }
       if (signal.aborted) return;
       if (!user) {
         router.replace("/");

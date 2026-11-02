@@ -13,6 +13,7 @@ import {
   Flame,
   CheckCircle2,
   Compass,
+  Pencil,
 } from "lucide-react";
 import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
 import { updateReadingStatus, deleteBook, type BookStatus } from "@/app/actions/library.actions";
@@ -393,6 +394,15 @@ export default function ShelfPage() {
                 >
                   <Layers className="w-3.5 h-3.5 text-zinc-400" />
                   Shelves & Tags ({(latestBook.shelves?.length || 0) + (latestBook.tags?.length || 0)})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setEditingBook(latestBook)}
+                  className="inline-flex items-center gap-2 px-4 py-3 rounded-full bg-[#202a23] hover:bg-[#263229] border border-[#344137] hover:border-[#d7f36a]/30 text-xs font-mono text-zinc-300 transition-colors cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-zinc-400" />
+                  Edit Metadata
                 </button>
 
                 {latestBook.status !== "completed" ? (
