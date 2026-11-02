@@ -540,7 +540,12 @@ async function executeAction(action: QueueAction): Promise<void> {
 
   switch (action.type) {
     case "syncProgress":
-      await syncProgress(action.args.bookId, action.args.cfi, action.args.progressPercentage);
+      await syncProgress(
+        action.args.bookId,
+        action.args.cfi,
+        action.args.progressPercentage,
+        action.args.clientUpdatedAt
+      );
       break;
     case "logSession":
       await logReadingSession(
@@ -829,3 +834,27 @@ export function initOfflineSync(): void {
   window.addEventListener("online", flushIfOnline);
   void flushIfOnline();
 }
+
+/**
+ * Purges all local offline state (positions, bookmarks, highlights, and queued mutations)
+ * for a deleted book so stale offline mutations never resurrect deleted book records.
+ */
+export async function purgeBookOfflineData(bookId: string): Promise<void> {
+  await withQueueLock(async () => {
+    const queue = await getQueue();
+    const filtered = queue.filter((entry) => {
+      const args = entry.action.args as { bookId?: string };
+      return args.bookId !== bookId;
+    });
+    await setQueue(filtered);
+  });
+
+  await clearLocalReadingPosition(bookId);
+
+  const localBookmarks = await getLocalBookmarks(bookId);
+  await Promise.all(localBookmarks.map((b) => removeLocalBookmark(b.id)));
+
+  const localHighlights = await getLocalHighlights(bookId);
+  await Promise.all(localHighlights.map((h) => removeLocalHighlight(h.id)));
+}
+

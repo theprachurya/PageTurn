@@ -24,6 +24,7 @@ import { ManageCollectionsDialog } from "@/components/library/manage-collections
 import { EditBookMetadataDialog } from "@/components/library/edit-book-metadata-dialog";
 import { updateReadingStatus, deleteBook, type BookStatus } from "@/app/actions/library.actions";
 import { removeCachedEpub } from "@/lib/epub-cache";
+import { purgeBookOfflineData } from "@/lib/offline-queue";
 import { toast } from "@/lib/toast";
 
 const BookUploader = dynamic(
@@ -156,6 +157,7 @@ export default function LibraryPage() {
     try {
       await deleteBook(bookId);
       await removeCachedEpub(bookId);
+      await purgeBookOfflineData(bookId);
       toast.success("Document removed");
       fetchLibraryData();
     } catch (err) {

@@ -1,22 +1,46 @@
 "use server";
 
 import { requireUser } from "@/lib/supabase/require-user";
+import { format } from "date-fns";
 
 // ─── Progress ──────────────────────────────────────────────────
 
 export async function syncProgress(
   bookId: string,
   cfi: string,
-  progressPercentage: number
+  progressPercentage: number,
+  clientUpdatedAt?: string
 ) {
   const { supabase, user } = await requireUser();
+
+  const incomingDate = clientUpdatedAt ? new Date(clientUpdatedAt) : new Date();
+  const safeTimestamp = Number.isNaN(incomingDate.getTime())
+    ? new Date().toISOString()
+    : incomingDate.toISOString();
+
+  // Last-Write-Wins guard: do not overwrite a newer remote position with a stale queued mutation
+  if (clientUpdatedAt) {
+    const { data: existing } = await supabase
+      .from("user_books")
+      .select("last_read_at")
+      .eq("user_id", user.id)
+      .eq("book_id", bookId)
+      .maybeSingle();
+
+    if (
+      existing?.last_read_at &&
+      new Date(existing.last_read_at).getTime() > new Date(safeTimestamp).getTime()
+    ) {
+      return;
+    }
+  }
 
   const { error } = await supabase
     .from("user_books")
     .update({
       current_cfi: cfi,
       progress_percentage: Math.min(progressPercentage, 100),
-      last_read_at: new Date().toISOString(),
+      last_read_at: safeTimestamp,
     })
     .eq("user_id", user.id)
     .eq("book_id", bookId);
@@ -36,7 +60,12 @@ export async function logReadingSession(
 ) {
   const { supabase, user } = await requireUser();
 
-  const sessionDate = new Date(endTime).toISOString().split("T")[0];
+  // Format date consistently with getStats() and HistoryPage local calendar keys
+  const parsedEnd = new Date(endTime);
+  const sessionDate = format(
+    Number.isNaN(parsedEnd.getTime()) ? new Date() : parsedEnd,
+    "yyyy-MM-dd"
+  );
 
   const { error } = await supabase.from("reading_sessions").insert({
     user_id: user.id,
@@ -51,7 +80,6 @@ export async function logReadingSession(
 
   if (error) throw new Error(`Failed to log session: ${error.message}`);
 
-  // Also update last_read_at to ensure history stays in sync with sessions
   await supabase
     .from("user_books")
     .update({ last_read_at: new Date().toISOString() })

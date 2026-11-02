@@ -158,3 +158,33 @@ CREATE POLICY "Users can upload own covers"
 CREATE POLICY "Anyone can view covers"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'covers');
+
+-- Allow users to update/overwrite (on retry upsert) and delete their own EPUBs
+CREATE POLICY "Users can update own epubs"
+  ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'epubs' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Users can delete own epubs"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'epubs' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- Allow users to update and delete their own covers
+CREATE POLICY "Users can update own covers"
+  ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'covers' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Users can delete own covers"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'covers' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );

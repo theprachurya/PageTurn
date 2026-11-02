@@ -21,14 +21,37 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ReaderToolbar, type NavItem, type BookmarkData } from "./reader-toolbar";
 import { DictionaryPopover } from "./dictionary-popover";
-import { HighlightPopover, type HighlightColor } from "./highlight-popover";
+import {
+  HighlightPopover,
+  HIGHLIGHT_COLORS,
+  type HighlightColor,
+} from "./highlight-popover";
 import { useHighlights } from "@/lib/hooks/use-highlights";
+import { appEvents } from "@/lib/app-events";
+import { toast } from "@/lib/toast";
 
 interface EpubReaderProps {
   bookId: string;
   epubUrl: string | ArrayBuffer;
   initialCfi?: string | null;
   initialProgress?: number;
+}
+
+function resolveHighlightHex(color: string): string {
+  return HIGHLIGHT_COLORS[color as HighlightColor] || color || HIGHLIGHT_COLORS.yellow;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function EpubReader({
@@ -40,9 +63,18 @@ export function EpubReader({
   const viewerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<Book | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
-  const sessionStartRef = useRef<Date>(new Date());
+
+  // Active reading session tracking (excludes hidden tab & idle > 2m)
+  const sessionStartRef = useRef<Date | null>(null);
+  const activeReadingMsRef = useRef<number>(0);
+  const lastTickRef = useRef<number>(0);
+  const lastActivityRef = useRef<number>(0);
+
   const totalWordsRef = useRef<number>(0);
-  
+  const lastProgressPctRef = useRef<number | null>(null);
+  const sessionWordsReadRef = useRef<number>(0);
+  const wpmRef = useRef<number>(250);
+
   const [showToolbar, setShowToolbar] = useState(false);
   const [distractionFree, setDistractionFree] = useState(false);
   const [flipDirection, setFlipDirection] = useState<"next" | "prev" | null>(null);
@@ -53,11 +85,10 @@ export function EpubReader({
   const [toc, setToc] = useState<NavItem[]>([]);
   const [settings, setSettings] = useState<ReaderSettings>(getReaderSettings());
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
-  const sessionWordsReadRef = useRef<number>(0);
-  const wpmRef = useRef<number>(250); // Default average WPM
 
   const turnPage = useCallback((dir: "next" | "prev") => {
     if (!renditionRef.current) return;
+    lastActivityRef.current = Date.now();
     setFlipDirection(dir);
     if (dir === "next") {
       renditionRef.current.next();
@@ -73,32 +104,44 @@ export function EpubReader({
   useEffect(() => {
     turnPageRef.current = turnPage;
   }, [turnPage]);
-  
-  // Phase 1 State
+
   const [bookmarks, setBookmarks] = useState<BookmarkData[]>([]);
   const [searchResults, setSearchResults] = useState<{ cfi: string; excerpt: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  
+  const searchAbortRef = useRef<AbortController | null>(null);
+
   const { highlights, addHighlight, removeHighlight, updateHighlight } = useHighlights(bookId);
 
-  // Keep a ref in sync so epub.js listeners (which close over mount-time values)
-  // always see the latest highlights without requiring a full effect re-run.
   const highlightsRef = useRef(highlights);
-  useEffect(() => { highlightsRef.current = highlights; }, [highlights]);
+  useEffect(() => {
+    highlightsRef.current = highlights;
+  }, [highlights]);
 
-  // Keep a ref for currentCfi so the Realtime callback can read it without
-  // re-subscribing on every page turn.
   const currentCfiRef = useRef(currentCfi);
-  useEffect(() => { currentCfiRef.current = currentCfi; }, [currentCfi]);
+  useEffect(() => {
+    currentCfiRef.current = currentCfi;
+  }, [currentCfi]);
 
-  const [selection, setSelection] = useState<{ cfiRange: string; text: string; x: number; y: number } | null>(null);
+  const [selection, setSelection] = useState<{
+    cfiRange: string;
+    text: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
-  const [activeHighlightPos, setActiveHighlightPos] = useState<{ x: number, y: number } | null>(null);
-  
+  const [activeHighlightPos, setActiveHighlightPos] = useState<{ x: number; y: number } | null>(
+    null
+  );
+
   const [isReadingAloud, setIsReadingAloud] = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  
-  const [dictionaryWord, setDictionaryWord] = useState<{ word: string; x: number; y: number } | null>(null);
+  const ttsPlayingRef = useRef(false);
+
+  const [dictionaryWord, setDictionaryWord] = useState<{
+    word: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [syncPrompt, setSyncPrompt] = useState<{ cfi: string; date: string } | null>(null);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,16 +151,27 @@ export function EpubReader({
   useEffect(() => {
     chapterRef.current = chapter;
   }, [chapter]);
-  
-  // We still need the Supabase client for Realtime subscriptions (client-only)
+
   const supabase = useMemo(() => createClient(), []);
 
-  // Initialize offline sync listener once
   useEffect(() => {
     initOfflineSync();
   }, []);
 
-  // Load Bookmarks via Server Actions
+  // Accumulate active reading time (only when tab is visible and user interacted within last 2 mins)
+  const accumulateReadingTime = useCallback(() => {
+    const now = Date.now();
+    const isVisible = typeof document !== "undefined" && document.visibilityState === "visible";
+    const lastActivity = lastActivityRef.current || now;
+    const lastTick = lastTickRef.current || now;
+    const isIdle = now - lastActivity > 120_000;
+    if (isVisible && !isIdle) {
+      activeReadingMsRef.current += Math.max(0, now - lastTick);
+    }
+    lastTickRef.current = now;
+  }, []);
+
+  // Load Bookmarks via Server Actions + Local Queue Merge
   useEffect(() => {
     let mounted = true;
 
@@ -136,9 +190,10 @@ export function EpubReader({
       if (!mounted) return;
       const queue = queueResult.status === "fulfilled" ? queueResult.value : [];
       const local = localResult.status === "fulfilled" ? localResult.value : [];
-      const cloud = remoteResult.status === "fulfilled"
-        ? remoteResult.value
-        : { data: [], available: false };
+      const cloud =
+        remoteResult.status === "fulfilled"
+          ? remoteResult.value
+          : { data: [], available: false };
 
       const pendingAdds = new Set<string>();
       const pendingDeletes = new Set<string>();
@@ -155,7 +210,7 @@ export function EpubReader({
       }
 
       const merged = new Map<string, BookmarkData>(
-        (cloud.available ? cloud.data : []).map((item) => [item.id, item]),
+        (cloud.available ? cloud.data : []).map((item) => [item.id, item])
       );
       for (const item of local) {
         if (!cloud.available || pendingAdds.has(item.id)) {
@@ -171,8 +226,8 @@ export function EpubReader({
 
       setBookmarks(
         [...merged.values()].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        ),
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
       );
     }
 
@@ -182,18 +237,25 @@ export function EpubReader({
     };
   }, [bookId]);
 
-  // Real-time Sync Subscription (must stay client-side)
-  // Keys only on bookId — reads currentCfi from currentCfiRef to avoid
-  // tearing down the channel on every page turn.
+  // Real-time Sync Subscription
   useEffect(() => {
     const channel = supabase
       .channel(`sync_${bookId}`)
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "user_books", filter: `book_id=eq.${bookId}` },
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "user_books",
+          filter: `book_id=eq.${bookId}`,
+        },
         (payload: { new: Record<string, unknown> }) => {
           const newData = payload.new as { current_cfi?: string; last_read_at?: string };
-          if (newData.current_cfi && newData.current_cfi !== currentCfiRef.current && newData.last_read_at) {
+          if (
+            newData.current_cfi &&
+            newData.current_cfi !== currentCfiRef.current &&
+            newData.last_read_at
+          ) {
             const timeDiff = new Date().getTime() - new Date(newData.last_read_at).getTime();
             if (timeDiff < 10000) {
               setSyncPrompt({ cfi: newData.current_cfi, date: newData.last_read_at });
@@ -203,26 +265,43 @@ export function EpubReader({
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [bookId, supabase]);
 
   // Apply settings to rendition
   const applySettings = useCallback((rendition: Rendition, s: ReaderSettings) => {
     const themes = {
-      light: { 
-        body: { background: "#ffffff", color: "#18181b", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+      light: {
+        body: {
+          background: "#ffffff",
+          color: "#18181b",
+          padding: "2rem 5% !important",
+          "overflow-x": "hidden !important",
+        },
         img: { "max-width": "100% !important", height: "auto !important" },
-        svg: { "max-width": "100% !important", height: "auto !important" }
+        svg: { "max-width": "100% !important", height: "auto !important" },
       },
-      dark: { 
-        body: { background: "#0f0f12", color: "#f4f4f5", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+      dark: {
+        body: {
+          background: "#0f0f12",
+          color: "#f4f4f5",
+          padding: "2rem 5% !important",
+          "overflow-x": "hidden !important",
+        },
         img: { "max-width": "100% !important", height: "auto !important" },
-        svg: { "max-width": "100% !important", height: "auto !important" }
+        svg: { "max-width": "100% !important", height: "auto !important" },
       },
-      sepia: { 
-        body: { background: "#f4ecd8", color: "#5b4636", padding: "2rem 5% !important", "overflow-x": "hidden !important" },
+      sepia: {
+        body: {
+          background: "#f4ecd8",
+          color: "#5b4636",
+          padding: "2rem 5% !important",
+          "overflow-x": "hidden !important",
+        },
         img: { "max-width": "100% !important", height: "auto !important" },
-        svg: { "max-width": "100% !important", height: "auto !important" }
+        svg: { "max-width": "100% !important", height: "auto !important" },
       },
     };
 
@@ -239,9 +318,8 @@ export function EpubReader({
     rendition.themes.fontSize(`${s.fontSize}%`);
     rendition.themes.override("font-family", fontFamilies[s.fontFamily]);
 
-    // Always override background and color so dark/sepia modes work regardless of publisher CSS
-    rendition.themes.override("background", themes[s.theme as keyof typeof themes].body.background);
-    rendition.themes.override("color", themes[s.theme as keyof typeof themes].body.color);
+    rendition.themes.override("background", themes[s.theme].body.background);
+    rendition.themes.override("color", themes[s.theme].body.color);
 
     if (s.disablePublisherCSS) {
       rendition.themes.override("line-height", "1.6");
@@ -255,46 +333,67 @@ export function EpubReader({
   }, []);
 
   // Save progress via offline queue (debounced)
-  const saveProgress = useCallback((cfi: string, pct: number) => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    const progress = { cfi, progressPercentage: Math.min(pct, 100) };
-    pendingProgressRef.current = progress;
-    saveTimerRef.current = setTimeout(async () => {
-      pendingProgressRef.current = null;
-      await enqueue({
-        type: "syncProgress",
-        args: { bookId, ...progress },
-      });
-    }, 3000);
-  }, [bookId]);
+  const saveProgress = useCallback(
+    (cfi: string, pct: number) => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      const progressPayload = {
+        cfi,
+        progressPercentage: Math.min(pct, 100),
+        clientUpdatedAt: new Date().toISOString(),
+      };
+      pendingProgressRef.current = progressPayload;
+      saveTimerRef.current = setTimeout(async () => {
+        pendingProgressRef.current = null;
+        await enqueue({
+          type: "syncProgress",
+          args: { bookId, ...progressPayload },
+        });
+      }, 3000);
+    },
+    [bookId]
+  );
 
-  // Log reading session on unmount via offline queue
+  // Flush active reading session (>= 30s active time)
   const logSession = useCallback(async () => {
-    const endTime = new Date();
-    const durationMs = endTime.getTime() - sessionStartRef.current.getTime();
-    const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+    accumulateReadingTime();
+    const durationMs = activeReadingMsRef.current;
+    const startTimeIso = (sessionStartRef.current ?? new Date()).toISOString();
+
+    // Reset immediately so visibilitychange + unmount never double-log the same session
+    activeReadingMsRef.current = 0;
+    const wordsReadSnapshot = sessionWordsReadRef.current;
+    sessionWordsReadRef.current = 0;
+    sessionStartRef.current = new Date();
+    lastTickRef.current = Date.now();
 
     if (durationMs < 30000) return;
+
+    const endTime = new Date();
+    const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
 
     await enqueue({
       type: "logSession",
       args: {
         bookId,
-        startTime: sessionStartRef.current.toISOString(),
+        startTime: startTimeIso,
         endTime: endTime.toISOString(),
         durationMinutes,
         chapterName: chapterRef.current || null,
-        wordsRead: sessionWordsReadRef.current,
+        wordsRead: wordsReadSnapshot,
       },
     });
-  }, [bookId]);
+  }, [accumulateReadingTime, bookId]);
 
   // Initialize epub.js
   useEffect(() => {
     if (!viewerRef.current) return;
 
     sessionStartRef.current = new Date();
+    activeReadingMsRef.current = 0;
+    lastTickRef.current = Date.now();
+    lastActivityRef.current = Date.now();
     sessionWordsReadRef.current = 0;
+    lastProgressPctRef.current = null;
 
     const book = ePub(epubUrl);
     bookRef.current = book;
@@ -311,7 +410,11 @@ export function EpubReader({
 
     applySettings(rendition, settings);
 
-    (rendition as unknown as { hooks: { content: { register: (fn: (contents: { document: Document }) => void) => void } } }).hooks.content.register((contents: { document: Document }) => {
+    (
+      rendition as unknown as {
+        hooks: { content: { register: (fn: (contents: { document: Document }) => void) => void } };
+      }
+    ).hooks.content.register((contents: { document: Document }) => {
       const style = contents.document.createElement("style");
       style.innerHTML = `
         ::-webkit-scrollbar { width: 6px; }
@@ -324,7 +427,6 @@ export function EpubReader({
       contents.document.head.appendChild(style);
     });
 
-
     if (currentCfi) {
       rendition.display(currentCfi);
     } else if (initialCfi) {
@@ -333,21 +435,29 @@ export function EpubReader({
       rendition.display();
     }
 
-    // Extract TOC
     book.loaded.navigation.then((nav) => {
       if (nav && nav.toc) {
         setToc(nav.toc as unknown as NavItem[]);
       }
     });
 
-    rendition.on("relocated", ((...args: unknown[]) => {
-      const location = args[0] as { start: { cfi: string; displayed: { page: number; total: number } }; atEnd: boolean };
+    rendition.on("relocated", (...args: unknown[]) => {
+      accumulateReadingTime();
+      lastActivityRef.current = Date.now();
+
+      const location = args[0] as {
+        start: { cfi: string; displayed: { page: number; total: number } };
+        atEnd: boolean;
+      };
       const cfi = location.start.cfi;
       setCurrentCfi(cfi);
       setSelection(null);
+      setDictionaryWord(null);
 
+      let currentFraction = progress / 100;
       if (book.locations.length() > 0) {
-        const pct = book.locations.percentageFromCfi(cfi) * 100;
+        currentFraction = book.locations.percentageFromCfi(cfi);
+        const pct = currentFraction * 100;
         setProgress(pct);
         saveProgress(cfi, pct);
       }
@@ -360,99 +470,111 @@ export function EpubReader({
         }
       }
 
-      // Re-apply highlights after relocating (read from ref to avoid stale closure)
+      // Re-apply highlights with proper hex colors
       setTimeout(() => {
-        highlightsRef.current.forEach(hl => {
+        highlightsRef.current.forEach((hl) => {
           try {
-            rendition.annotations.highlight(hl.cfi_range, {}, () => {}, "epub-highlight", { fill: hl.color });
-          } catch { /* ignore — CFI may not be in current view */ }
+            rendition.annotations.highlight(
+              hl.cfi_range,
+              {},
+              () => {},
+              "epub-highlight",
+              { fill: resolveHighlightHex(hl.color) }
+            );
+          } catch {
+            /* ignore — CFI may not be in current view */
+          }
         });
       }, 100);
 
-      // Calculate words on screen for WPM estimation
+      // Accurate delta-based word count estimation (avoids re-counting whole chapter on scroll)
       try {
-        // Estimate visible words from the iframe's text content
-        const iframe = viewerRef.current?.querySelector("iframe");
-        const visibleText = iframe?.contentDocument?.body?.innerText || "";
-        const wordCount = visibleText.split(/\s+/).filter(Boolean).length;
-        sessionWordsReadRef.current += wordCount || 250; // fallback to 250
+        const estimatedTotalWords = totalWordsRef.current > 0 ? totalWordsRef.current : 80000;
+        if (lastProgressPctRef.current !== null) {
+          const deltaFraction = currentFraction - lastProgressPctRef.current;
+          // Only count forward reading progress increments (up to 5% per relocation event)
+          if (deltaFraction > 0 && deltaFraction < 0.05) {
+            sessionWordsReadRef.current += Math.round(deltaFraction * estimatedTotalWords);
+          }
+        }
+        lastProgressPctRef.current = currentFraction;
 
-        // Update rolling WPM estimation if they've been reading for at least a minute
-        const elapsedMinutes = (new Date().getTime() - sessionStartRef.current.getTime()) / 60000;
-        if (elapsedMinutes > 1) {
-          wpmRef.current = Math.max(100, Math.min(1000, Math.round(sessionWordsReadRef.current / elapsedMinutes)));
+        const elapsedMinutes = activeReadingMsRef.current / 60000;
+        if (elapsedMinutes >= 1 && sessionWordsReadRef.current > 50) {
+          wpmRef.current = Math.max(
+            100,
+            Math.min(1000, Math.round(sessionWordsReadRef.current / elapsedMinutes))
+          );
         }
 
-        // Estimate remaining time in book based on progress
-        const currentPct = book.locations.length() > 0 ? book.locations.percentageFromCfi(cfi) : (progress / 100);
-        const remainingProgress = 1 - currentPct;
-        // Use actual word count from locations if available, otherwise fall back to a rough estimate
-        const estimatedTotalWords = totalWordsRef.current > 0 ? totalWordsRef.current : 80000;
-        const remainingWords = estimatedTotalWords * remainingProgress;
+        const remainingWords = estimatedTotalWords * Math.max(0, 1 - currentFraction);
         setEstimatedTimeRemaining(Math.round(remainingWords / wpmRef.current));
       } catch (e) {
         console.warn("Failed to calculate words", e);
       }
-    }));
+    });
 
-    rendition.on("rendered", ((...args: unknown[]) => {
+    rendition.on("rendered", (...args: unknown[]) => {
       const section = args[0] as { href: string };
       const currentToc = book.navigation?.toc;
       if (currentToc) {
-        const match = currentToc.find(
-          (item: { href: string }) => section.href.includes(item.href)
+        const match = currentToc.find((item: { href: string }) =>
+          section.href.includes(item.href)
         );
         if (match) setChapter((match as { label: string }).label?.trim() || "");
       }
-    }));
+    });
 
-    // Text Selection
-    rendition.on("selected", ((...args: unknown[]) => {
+    // Text Selection -> Highlight Popover + Single-Word Dictionary Lookup
+    rendition.on("selected", (...args: unknown[]) => {
+      lastActivityRef.current = Date.now();
       const cfiRange = args[0] as string;
       const contents = args[1] as { window: Window };
-      const range = contents.window.getSelection()?.getRangeAt(0);
-      if (!range) return;
+      const sel = contents.window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
       const rect = range.getBoundingClientRect();
-      const text = contents.window.getSelection()?.toString() || "";
-      
-      const iframe = viewerRef.current?.querySelector("iframe");
-      if (iframe) {
-        const iframeRect = iframe.getBoundingClientRect();
-        setSelection({
-          cfiRange,
-          text,
-          x: iframeRect.left + rect.left + rect.width / 2,
-          y: iframeRect.top + rect.top,
-        });
-      } else {
-        setSelection({
-          cfiRange,
-          text,
-          x: rect.left + rect.width / 2,
-          y: rect.top,
-        });
-      }
-      setActiveHighlightId(null);
-    }));
+      const text = sel.toString().trim();
+      if (!text) return;
 
-    // Existing Highlight Click (read from ref to avoid stale closure)
-    rendition.on("markClicked", ((...args: unknown[]) => {
+      const iframe = viewerRef.current?.querySelector("iframe");
+      const iframeRect = iframe?.getBoundingClientRect();
+      const x = (iframeRect ? iframeRect.left : 0) + rect.left + rect.width / 2;
+      const y = (iframeRect ? iframeRect.top : 0) + rect.top;
+
+      setSelection({ cfiRange, text, x, y });
+      setActiveHighlightId(null);
+
+      // If selection is a single dictionary word (letters/hyphens), also show DictionaryPopover
+      const cleanedWord = text.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, "");
+      if (cleanedWord && /^[a-zA-Z-]{2,30}$/.test(cleanedWord) && !/\s/.test(text)) {
+        setDictionaryWord({ word: cleanedWord, x, y: y + rect.height });
+      } else {
+        setDictionaryWord(null);
+      }
+    });
+
+    // Existing Highlight Click
+    rendition.on("markClicked", (...args: unknown[]) => {
       const cfiRange = args[0] as string;
       const contents = args[2] as { document: Document };
-      const highlight = highlightsRef.current.find(h => h.cfi_range === cfiRange);
+      const highlight = highlightsRef.current.find((h) => h.cfi_range === cfiRange);
       if (highlight) {
         setActiveHighlightId(highlight.id);
-        
+        setDictionaryWord(null);
+
         try {
           const range = contents.document.querySelector(`[data-epubcfi="${cfiRange}"]`);
-          const rect = range ? range.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
-          
+          const rect = range
+            ? range.getBoundingClientRect()
+            : { left: window.innerWidth / 2, top: window.innerHeight / 2, width: 0, height: 0 };
+
           const iframe = viewerRef.current?.querySelector("iframe");
           if (iframe && range) {
             const iframeRect = iframe.getBoundingClientRect();
-            setActiveHighlightPos({ 
-              x: iframeRect.left + rect.left + rect.width / 2, 
-              y: iframeRect.top + rect.top 
+            setActiveHighlightPos({
+              x: iframeRect.left + rect.left + rect.width / 2,
+              y: iframeRect.top + rect.top,
             });
           } else {
             setActiveHighlightPos({ x: rect.left, y: rect.top });
@@ -461,36 +583,43 @@ export function EpubReader({
           setActiveHighlightPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
         }
       }
-    }));
-
-    // Iframe clicks (only toggle on pure left clicks, not selections or middle clicks)
-    rendition.on("click", ((...args: unknown[]) => {
-      const e = args[0] as MouseEvent | undefined;
-      // Ignore right or middle clicks (button 1 or 2)
-      if (e && e.button !== undefined && e.button !== 0) return;
-
-      // Ignore if text is selected in the iframe
-      const iframe = viewerRef.current?.querySelector("iframe");
-      if (iframe?.contentWindow) {
-        const selection = iframe.contentWindow.getSelection();
-        if (selection && selection.toString().length > 0) return;
-      }
-
-      setShowToolbar(prev => !prev);
-    }));
-
-    book.ready.then(() => {
-      return book.locations.generate(1600);
-    }).then(() => {
-      // Estimate total words from the generated locations.
-      // Each location span is ~1600 characters ≈ ~267 words (avg 6 chars/word).
-      const totalLocations = book.locations.length();
-      totalWordsRef.current = Math.round(totalLocations * (1600 / 6));
     });
 
+    rendition.on("click", (...args: unknown[]) => {
+      const e = args[0] as MouseEvent | undefined;
+      if (e && e.button !== undefined && e.button !== 0) return;
+
+      const iframe = viewerRef.current?.querySelector("iframe");
+      if (iframe?.contentWindow) {
+        const sel = iframe.contentWindow.getSelection();
+        if (sel && sel.toString().length > 0) return;
+      }
+
+      setShowToolbar((prev) => !prev);
+    });
+
+    book.ready
+      .then(() => book.locations.generate(1600))
+      .then(() => {
+        const totalLocations = book.locations.length();
+        totalWordsRef.current = Math.round(totalLocations * (1600 / 6));
+      });
+
+    const isInputFocused = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = (target?.tagName || document.activeElement?.tagName || "").toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select" || Boolean(target?.isContentEditable);
+    };
+
+    const keydownHandler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        appEvents.openCommandPalette();
+      }
+    };
+
     const keyupHandler = (e: KeyboardEvent) => {
-      const activeTag = (document.activeElement?.tagName || "").toLowerCase();
-      if (activeTag === "input" || activeTag === "textarea") return;
+      if (e.metaKey || e.ctrlKey || e.altKey || isInputFocused(e)) return;
 
       if (e.key === "ArrowLeft") turnPageRef.current("prev");
       if (e.key === "ArrowRight") turnPageRef.current("next");
@@ -500,19 +629,40 @@ export function EpubReader({
       if (e.key === "Escape") {
         setDistractionFree(false);
         setShowToolbar(false);
+        setDictionaryWord(null);
+        setSelection(null);
       }
     };
 
-    rendition.on("keyup", ((...args: unknown[]) => {
-      const e = args[0] as KeyboardEvent;
-      keyupHandler(e);
-    }));
+    rendition.on("keydown", (...args: unknown[]) => {
+      keydownHandler(args[0] as KeyboardEvent);
+    });
+
+    rendition.on("keyup", (...args: unknown[]) => {
+      keyupHandler(args[0] as KeyboardEvent);
+    });
 
     document.addEventListener("keyup", keyupHandler);
+
+    const handleVisibilityChange = () => {
+      accumulateReadingTime();
+      if (document.visibilityState === "hidden") {
+        void logSession();
+      }
+    };
+
+    const handlePageHide = () => {
+      void logSession();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       void logSession();
       document.removeEventListener("keyup", keyupHandler);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
       const pendingProgress = pendingProgressRef.current;
@@ -526,23 +676,31 @@ export function EpubReader({
       rendition.destroy();
       book.destroy();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Book initialization only runs when epubUrl changes; settings and progress are synchronized via dedicated handlers and refs
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Book initialization only runs when epubUrl changes
   }, [epubUrl]);
 
-  const updateSettings = (newSettings: Partial<ReaderSettings>) => {
-    const updated = { ...settings, ...newSettings };
-    setSettings(updated);
-    saveReaderSettings(newSettings);
-    
-    if (renditionRef.current) {
-      applySettings(renditionRef.current, updated);
-    }
-  };
+  const updateSettings = useCallback(
+    (newSettings: Partial<ReaderSettings>) => {
+      setSettings((prev) => {
+        const updated = { ...prev, ...newSettings };
+        saveReaderSettings(newSettings);
+        if (renditionRef.current) {
+          applySettings(renditionRef.current, updated);
+        }
+        return updated;
+      });
+    },
+    [applySettings]
+  );
 
-  const navigateTo = (href: string) => { renditionRef.current?.display(href); setSelection(null); };
+  const navigateTo = useCallback((href: string) => {
+    renditionRef.current?.display(href);
+    setSelection(null);
+    setDictionaryWord(null);
+  }, []);
 
   const handleCenterTap = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only allow left clicks
+    if (e.button !== 0) return;
     if (selection || dictionaryWord) {
       setSelection(null);
       setDictionaryWord(null);
@@ -589,12 +747,38 @@ export function EpubReader({
     }
   };
 
-  // ─── Actions (now via Server Actions / Offline Queue) ────────
+  const handleDeleteBookmark = useCallback(
+    async (bookmarkId: string) => {
+      const bookmark = bookmarks.find((item) => item.id === bookmarkId);
+      if (!bookmark) return;
 
-  const handleToggleBookmark = async () => {
-    // Snapshot bookmarks at the time of click to avoid stale closure
+      setBookmarks((current) => current.filter((item) => item.id !== bookmarkId));
+
+      try {
+        await enqueue({
+          type: "removeBookmark",
+          args: { id: bookmarkId, bookId },
+        });
+      } catch (err) {
+        console.error("Failed to delete bookmark:", err);
+        await saveLocalBookmark({
+          id: bookmark.id,
+          bookId,
+          cfi: bookmark.cfi,
+          label: bookmark.label,
+          createdAt: bookmark.created_at,
+        }).catch(() => undefined);
+        setBookmarks((current) =>
+          current.some((item) => item.id === bookmarkId) ? current : [bookmark, ...current]
+        );
+      }
+    },
+    [bookId, bookmarks]
+  );
+
+  const handleToggleBookmark = useCallback(async () => {
     const snapshot = bookmarks;
-    const existing = snapshot.find(b => b.cfi === currentCfi);
+    const existing = snapshot.find((b) => b.cfi === currentCfi);
     if (existing) {
       await handleDeleteBookmark(existing.id);
     } else {
@@ -623,33 +807,7 @@ export function EpubReader({
         setBookmarks((prev) => prev.filter((bookmark) => bookmark.id !== optimistic.id));
       }
     }
-  };
-
-  const handleDeleteBookmark = async (bookmarkId: string) => {
-    const bookmark = bookmarks.find((item) => item.id === bookmarkId);
-    if (!bookmark) return;
-
-    setBookmarks((current) => current.filter((item) => item.id !== bookmarkId));
-
-    try {
-      await enqueue({
-        type: "removeBookmark",
-        args: { id: bookmarkId, bookId },
-      });
-    } catch (err) {
-      console.error("Failed to delete bookmark:", err);
-      await saveLocalBookmark({
-        id: bookmark.id,
-        bookId,
-        cfi: bookmark.cfi,
-        label: bookmark.label,
-        createdAt: bookmark.created_at,
-      }).catch(() => undefined);
-      setBookmarks((current) =>
-        current.some((item) => item.id === bookmarkId) ? current : [bookmark, ...current],
-      );
-    }
-  };
+  }, [ bookId, bookmarks, chapter, currentCfi, handleDeleteBookmark ]);
 
   const handleSaveHighlight = async (color: HighlightColor, note?: string) => {
     if (!selection) return;
@@ -664,14 +822,13 @@ export function EpubReader({
       });
 
       if (newHighlight && renditionRef.current) {
-        // Optimistically apply it to iframe
         try {
           renditionRef.current.annotations.highlight(
             selection.cfiRange,
             {},
             () => {},
             "epub-highlight",
-            { fill: color }
+            { fill: resolveHighlightHex(color) }
           );
         } catch (e) {
           console.error("Failed to apply highlight in rendition", e);
@@ -681,8 +838,8 @@ export function EpubReader({
       console.error("Highlight save failed", err);
     }
 
-    // Clear selection
     setSelection(null);
+    setDictionaryWord(null);
     if (viewerRef.current) {
       const iframe = viewerRef.current.querySelector("iframe");
       if (iframe?.contentWindow) {
@@ -693,14 +850,29 @@ export function EpubReader({
 
   const handleUpdateExistingHighlight = async (color: HighlightColor, note?: string) => {
     if (activeHighlightId) {
+      const existing = highlights.find((h) => h.id === activeHighlightId);
       await updateHighlight(activeHighlightId, { color, note });
+      if (existing && renditionRef.current) {
+        try {
+          renditionRef.current.annotations.remove(existing.cfi_range, "highlight");
+          renditionRef.current.annotations.highlight(
+            existing.cfi_range,
+            {},
+            () => {},
+            "epub-highlight",
+            { fill: resolveHighlightHex(color) }
+          );
+        } catch {
+          /* ignore */
+        }
+      }
     }
     setActiveHighlightId(null);
   };
 
   const handleDeleteHighlight = async () => {
     if (activeHighlightId) {
-      const highlight = highlights.find(h => h.id === activeHighlightId);
+      const highlight = highlights.find((h) => h.id === activeHighlightId);
       if (highlight && renditionRef.current) {
         renditionRef.current.annotations.remove(highlight.cfi_range, "highlight");
       }
@@ -710,20 +882,27 @@ export function EpubReader({
   };
 
   const handleSearch = async (query: string) => {
-    if (!bookRef.current || !query.trim()) return;
+    const trimmed = query.trim();
+    if (!bookRef.current || !trimmed) return;
+
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+
     setIsSearching(true);
     setSearchResults([]);
-    
+
     try {
       const book = bookRef.current;
       const results: { cfi: string; excerpt: string }[] = [];
-      const q = query.toLowerCase();
+      const safeRegex = new RegExp(escapeRegExp(trimmed), "gi");
 
       const bookWithSpine = book as unknown as {
         spine?: {
           spineItems?: Array<{
             load: (fn: unknown) => Promise<void>;
-            document: Document;
+            find?: (q: string) => Array<{ cfi: string; excerpt: string }>;
+            document?: Document;
             cfiFromElement: (el: Element) => string;
             unload: () => void;
           }>;
@@ -731,79 +910,161 @@ export function EpubReader({
       };
 
       for (const item of bookWithSpine.spine?.spineItems || []) {
-        await item.load(book.load.bind(book));
-        const text = item.document.body.textContent?.toLowerCase() || "";
-        
-        let idx = text.indexOf(q);
-        while (idx !== -1) {
-          const start = Math.max(0, idx - 40);
-          const end = Math.min(text.length, idx + q.length + 40);
-          let excerpt = item.document.body.textContent?.substring(start, end) || "";
-          const matchRegex = new RegExp(query, 'gi');
-          excerpt = excerpt.replace(matchRegex, (match: string) => `<strong class="text-purple-400">${match}</strong>`);
-          
-          const cfi = item.cfiFromElement(item.document.body);
-          
-          results.push({ cfi, excerpt: `...${excerpt}...` });
-          
-          idx = text.indexOf(q, idx + q.length);
-          if (results.length > 50) break;
+        if (controller.signal.aborted) return;
+
+        try {
+          await item.load(book.load.bind(book));
+
+          if (typeof item.find === "function") {
+            const matches = item.find(trimmed);
+            for (const m of matches) {
+              const escapedExcerpt = escapeHtml(m.excerpt || "").replace(
+                safeRegex,
+                (match: string) => `<strong class="text-[#d7f36a]">${match}</strong>`
+              );
+              results.push({ cfi: m.cfi, excerpt: `...${escapedExcerpt}...` });
+              if (results.length >= 50) break;
+            }
+          } else if (item.document?.body) {
+            const rawText = item.document.body.textContent || "";
+            const lowerText = rawText.toLowerCase();
+            const q = trimmed.toLowerCase();
+            let idx = lowerText.indexOf(q);
+            while (idx !== -1) {
+              const start = Math.max(0, idx - 40);
+              const end = Math.min(rawText.length, idx + q.length + 40);
+              const rawExcerpt = rawText.substring(start, end);
+              const escapedExcerpt = escapeHtml(rawExcerpt).replace(
+                safeRegex,
+                (match: string) => `<strong class="text-[#d7f36a]">${match}</strong>`
+              );
+              const cfi = item.cfiFromElement(item.document.body);
+              results.push({ cfi, excerpt: `...${escapedExcerpt}...` });
+              idx = lowerText.indexOf(q, idx + q.length);
+              if (results.length >= 50) break;
+            }
+          }
+        } finally {
+          item.unload();
         }
-        item.unload();
+
+        if (results.length >= 50) break;
+        await new Promise((r) => setTimeout(r, 0));
       }
-      setSearchResults(results);
+
+      if (!controller.signal.aborted) {
+        setSearchResults(results);
+      }
     } catch (e) {
       console.error("Search error", e);
     } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleToggleTTS = async () => {
-    if (isReadingAloud) {
-      window.speechSynthesis.cancel();
-      setIsReadingAloud(false);
-    } else {
-      try {
-        const location = (renditionRef.current as unknown as { location?: { start?: { cfi?: string } } })?.location;
-        if (!location || !bookRef.current) return;
-        
-        // Grab the current chapter's DOM
-        const iframe = viewerRef.current?.querySelector("iframe");
-        let text = "";
-        if (iframe?.contentDocument) {
-           text = iframe.contentDocument.body.innerText;
-        } else if (location.start?.cfi) {
-           const bookWithSpine = bookRef.current as unknown as { spine?: { get: (cfi: string) => { document?: Document } | null } };
-           const spineItem = bookWithSpine.spine?.get(location.start.cfi);
-           if (spineItem?.document) {
-             text = spineItem.document.body.innerText;
-           }
-        }
-        
-        if (!text) {
-          alert("Could not extract text for Read Aloud.");
-          return;
-        }
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
-        utterance.onend = () => setIsReadingAloud(false);
-        utteranceRef.current = utterance;
-        
-        window.speechSynthesis.speak(utterance);
-        setIsReadingAloud(true);
-      } catch (e) {
-        console.error("TTS Error", e);
+      if (!controller.signal.aborted) {
+        setIsSearching(false);
       }
     }
   };
 
+  // Chunked Web Speech Synthesis (avoids Chromium 15s cutoff)
+  const stopTTS = useCallback(() => {
+    ttsPlayingRef.current = false;
+    utteranceRef.current = null;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsReadingAloud(false);
+  }, []);
+
+  const handleToggleTTS = useCallback(async () => {
+    if (isReadingAloud) {
+      stopTTS();
+      return;
+    }
+
+    try {
+      const location = (
+        renditionRef.current as unknown as { location?: { start?: { cfi?: string } } }
+      )?.location;
+      if (!location || !bookRef.current) return;
+
+      const iframe = viewerRef.current?.querySelector("iframe");
+      let text = "";
+      if (iframe?.contentDocument) {
+        text = iframe.contentDocument.body.innerText;
+      } else if (location.start?.cfi) {
+        const bookWithSpine = bookRef.current as unknown as {
+          spine?: { get: (cfi: string) => { document?: Document } | null };
+        };
+        const spineItem = bookWithSpine.spine?.get(location.start.cfi);
+        if (spineItem?.document) {
+          text = spineItem.document.body.innerText;
+        }
+      }
+
+      const chunks = text
+        .split(/(?<=[.!?])\s+|\n+/g)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (chunks.length === 0) {
+        toast.error("Could not extract text for Read Aloud.");
+        return;
+      }
+
+      ttsPlayingRef.current = true;
+      setIsReadingAloud(true);
+
+      let index = 0;
+      const speakNext = () => {
+        if (!ttsPlayingRef.current || index >= chunks.length) {
+          stopTTS();
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(chunks[index]);
+        utterance.rate = 1.0;
+        utterance.onend = () => {
+          if (!ttsPlayingRef.current) return;
+          index += 1;
+          speakNext();
+        };
+        utterance.onerror = (ev) => {
+          if (ev.error !== "canceled" && ev.error !== "interrupted") {
+            console.warn("TTS error:", ev.error);
+          }
+          stopTTS();
+        };
+        utteranceRef.current = utterance;
+        window.speechSynthesis.speak(utterance);
+      };
+
+      speakNext();
+    } catch (e) {
+      console.error("TTS Error", e);
+      stopTTS();
+    }
+  }, [isReadingAloud, stopTTS]);
+
   useEffect(() => {
     return () => {
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      stopTTS();
+      searchAbortRef.current?.abort();
     };
-  }, []);
+  }, [stopTTS]);
+
+  // Register reader commands with AppShell / CommandPalette
+  useEffect(() => {
+    appEvents.setReaderHandlers({
+      onToggleTheme: (theme) => updateSettings({ theme }),
+      onToggleTTS: () => void handleToggleTTS(),
+      onToggleBookmark: () => void handleToggleBookmark(),
+      onToggleSidebar: () => setShowToolbar((prev) => !prev),
+      onToggleDistractionFree: () => setDistractionFree((prev) => !prev),
+      toc,
+      onNavigateChapter: navigateTo,
+    });
+    return () => {
+      appEvents.setReaderHandlers(null);
+    };
+  }, [handleToggleBookmark, handleToggleTTS, navigateTo, toc, updateSettings]);
 
   const bgColors = {
     light: "bg-[#f5f2eb]",
@@ -813,7 +1074,9 @@ export function EpubReader({
   const isBookmarked = bookmarks.some((b) => b.cfi === currentCfi);
 
   return (
-    <div className={`fixed inset-0 ${bgColors[settings.theme]} flex flex-col select-none md:select-auto`}>
+    <div
+      className={`fixed inset-0 ${bgColors[settings.theme]} flex flex-col select-none md:select-auto`}
+    >
       {/* Real-time Sync Prompt */}
       {syncPrompt && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-[#1b241e] text-zinc-100 border border-[#d7f36a]/40 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-5">
@@ -961,11 +1224,7 @@ export function EpubReader({
           {flipDirection === "prev" && <div className="paper-shadow-sweep-prev" />}
 
           {/* EPUB Viewer Surface */}
-          <div
-            ref={viewerRef}
-            onClick={handleCenterTap}
-            className="w-full h-full flex-1"
-          />
+          <div ref={viewerRef} onClick={handleCenterTap} className="w-full h-full flex-1" />
         </div>
       </div>
 
@@ -981,4 +1240,3 @@ export function EpubReader({
     </div>
   );
 }
-

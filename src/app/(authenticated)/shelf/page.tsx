@@ -17,6 +17,7 @@ import {
 import { BookCard, type BookData, type BookTag, type BookShelf } from "@/components/books/book-card";
 import { updateReadingStatus, deleteBook, type BookStatus } from "@/app/actions/library.actions";
 import { removeCachedEpub } from "@/lib/epub-cache";
+import { purgeBookOfflineData } from "@/lib/offline-queue";
 import { ManageCollectionsDialog } from "@/components/library/manage-collections-dialog";
 import { triggerUploadModal } from "@/lib/app-events";
 import { toast } from "@/lib/toast";
@@ -199,6 +200,7 @@ export default function ShelfPage() {
     try {
       await deleteBook(bookId);
       await removeCachedEpub(bookId);
+      await purgeBookOfflineData(bookId);
       toast.success("Document removed");
       fetchBooks();
     } catch (err) {
